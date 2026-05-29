@@ -1,0 +1,46 @@
+import { Router } from "express";
+import Blog from "../models/Blog.js";
+import Course from "../models/Course.js";
+import Department from "../models/Department.js";
+import Event from "../models/Event.js";
+import Faculty from "../models/Faculty.js";
+import Notice from "../models/Notice.js";
+import Student from "../models/Student.js";
+import TimetableEntry from "../models/TimetableEntry.js";
+import { listMyDepartmentStudents } from "../controllers/facultyStudentController.js";
+import { requireAuth } from "../middleware/auth.js";
+import assignmentRoutes from "./assignmentRoutes.js";
+import attendanceRoutes from "./attendanceRoutes.js";
+import aiRoutes from "./aiRoutes.js";
+import authRoutes from "./authRoutes.js";
+import contactRoutes from "./contactRoutes.js";
+import gradeRoutes from "./gradeRoutes.js";
+import resourceRoutes from "./resourceRoutes.js";
+import settingsRoutes from "./settingsRoutes.js";
+import pageContentRoutes from "./pageContentRoutes.js";
+import studentImportRoutes from "./studentImportRoutes.js";
+import userRoutes from "./userRoutes.js";
+
+const router = Router();
+
+router.use("/auth", authRoutes);
+router.use("/cms", pageContentRoutes);
+router.use("/settings", settingsRoutes);
+router.use("/ai", aiRoutes);
+router.use("/assignments", assignmentRoutes);
+router.use("/attendance", attendanceRoutes);
+router.use("/grades", gradeRoutes);
+router.use("/users", userRoutes);
+router.use("/students/import", studentImportRoutes);
+router.get("/students/my-department", requireAuth, listMyDepartmentStudents);
+router.use("/students", resourceRoutes(Student, { protectedRead: true }));
+router.use("/faculty", resourceRoutes(Faculty, { protectedRead: true }));
+router.use("/courses", resourceRoutes(Course, { protectedRead: true }));
+router.use("/timetable", resourceRoutes(TimetableEntry, { protectedRead: true }));
+router.use("/departments", resourceRoutes(Department));
+router.use("/blogs", resourceRoutes(Blog));
+router.use("/notices", resourceRoutes(Notice));
+router.use("/events", resourceRoutes(Event));
+router.use("/contacts", contactRoutes);
+
+export default router;

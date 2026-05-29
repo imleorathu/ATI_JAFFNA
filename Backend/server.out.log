@@ -1,0 +1,6 @@
+
+> ati-jaffna-backend@0.1.0 start
+> node server.js
+
+◇ injected env (4) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
+ATI Jaffna API running on http://localhost:5000
