@@ -1,6 +1,6 @@
-# ATI Jaffna University Website
+# ATI Jaffna Website
 
-Full-stack university website scaffold built with React, Vite, Tailwind CSS, Node.js, Express, and MongoDB.
+Full-stack ATI JAFFNA website scaffold built with React, Vite, Tailwind CSS, Node.js, Express, and MongoDB.
 
 ## Structure
 
