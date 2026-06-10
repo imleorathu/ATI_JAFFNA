@@ -3,6 +3,7 @@ import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import GlassCard from "./GlassCard";
 import SectionHeader from "./SectionHeader";
+import { useLanguage } from "../contexts/LanguageContext.jsx";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -10,13 +11,14 @@ const fadeUp = {
 };
 
 function SectionButton({ section, variant = "link", defaultText = "", defaultLink = "" }) {
+  const { translate } = useLanguage();
   const buttonText = section.buttonText || defaultText;
   const buttonLink = section.buttonLink || defaultLink;
   if (!buttonText || !buttonLink) return null;
   const className = variant === "primary" ? "clay-btn-primary mt-auto" : "mt-5 inline-flex items-center gap-2 text-sm font-bold text-clay-accent";
   const content = (
     <>
-      {buttonText}
+      {translate(buttonText)}
       {variant !== "primary" && <ArrowRight size={16} />}
     </>
   );
@@ -29,14 +31,15 @@ function SectionButton({ section, variant = "link", defaultText = "", defaultLin
 }
 
 function CmsLinkButton({ text, link, primary }) {
+  const { translate } = useLanguage();
   if (!text || !link) return null;
   const className = primary ? "clay-btn-primary" : "clay-btn-secondary";
 
   if (/^https?:\/\//i.test(link)) {
-    return <a href={link} target="_blank" rel="noopener noreferrer" className={className}>{text}</a>;
+    return <a href={link} target="_blank" rel="noopener noreferrer" className={className}>{translate(text)}</a>;
   }
 
-  return <Link to={link} className={className}>{text}</Link>;
+  return <Link to={link} className={className}>{translate(text)}</Link>;
 }
 
 export function CmsPageHeader({ cmsPage, fallbackEyebrow, fallbackTitle, fallbackText }) {
@@ -73,7 +76,8 @@ export function CmsPageHeader({ cmsPage, fallbackEyebrow, fallbackTitle, fallbac
   );
 }
 
-export default function CmsSections({ cmsPage, imageHeightClass = "h-48", cardVariant = "default", defaultButtonText = "", defaultButtonLink = "" }) {
+export default function CmsSections({ cmsPage, imageHeightClass = "h-48", cardVariant = "default", defaultButtonText = "", defaultButtonLink = "", showButtons = true }) {
+  const { translate } = useLanguage();
   const sections = (cmsPage?.published?.sections || []).filter((section) => section.visible !== false && (section.title || section.body || section.imageUrl || section.embedUrl));
   if (!sections.length) return null;
 
@@ -88,7 +92,7 @@ export default function CmsSections({ cmsPage, imageHeightClass = "h-48", cardVa
       variants={{ visible: { transition: { staggerChildren: useImageCard ? 0.1 : 0.08 } } }}
     >
       {sections.map((section, index) => {
-        const hasTextContent = section.eyebrow || section.title || section.body || section.buttonText || section.buttonLink || section.embedUrl;
+        const hasTextContent = section.eyebrow || section.title || section.body || (showButtons && (section.buttonText || section.buttonLink)) || section.embedUrl;
         const imageOnly = section.imageUrl && !hasTextContent;
 
         return (
@@ -103,10 +107,10 @@ export default function CmsSections({ cmsPage, imageHeightClass = "h-48", cardVa
               <>
                 {section.imageUrl && <img src={section.imageUrl} alt="" className={`${imageHeightClass} w-full object-cover transition duration-700 group-hover:scale-110`} />}
                 <div className="flex grow flex-col p-6">
-                  {section.eyebrow && <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-clay-accent">{section.eyebrow}</p>}
-                  {section.title && <h3 className="text-xl font-black text-clay-text">{section.title}</h3>}
-                  {section.body && <p className="mt-3 text-sm leading-6 text-clay-muted">{section.body}</p>}
-                  <SectionButton section={section} variant="primary" defaultText={defaultButtonText} defaultLink={defaultButtonLink} />
+                  {section.eyebrow && <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-clay-accent">{translate(section.eyebrow)}</p>}
+                  {section.title && <h3 className="text-xl font-black text-clay-text">{translate(section.title)}</h3>}
+                  {section.body && <p className="mt-3 text-sm leading-6 text-clay-muted">{translate(section.body)}</p>}
+                  {showButtons && <SectionButton section={section} variant="primary" defaultText={defaultButtonText} defaultLink={defaultButtonLink} />}
                 </div>
               </>
             ) : imageOnly ? (
@@ -123,10 +127,10 @@ export default function CmsSections({ cmsPage, imageHeightClass = "h-48", cardVa
                   className={`flex h-full flex-col p-5 ${section.textAlign === "center" ? "items-center text-center" : ""}`}
                   style={section.backgroundColor ? { backgroundColor: section.backgroundColor } : undefined}
                 >
-                  {section.eyebrow && <p className="text-xs font-bold uppercase tracking-[0.16em] text-clay-accent">{section.eyebrow}</p>}
-                  {section.title && <h3 className={`text-xl font-black text-clay-text ${section.eyebrow ? "mt-2" : ""}`}>{section.title}</h3>}
-                  {section.body && <p className={`mt-3 whitespace-pre-line text-sm leading-6 text-clay-muted ${section.type === "quote" ? "text-lg italic" : ""}`}>{section.body}</p>}
-                  <SectionButton section={section} />
+                  {section.eyebrow && <p className="text-xs font-bold uppercase tracking-[0.16em] text-clay-accent">{translate(section.eyebrow)}</p>}
+                  {section.title && <h3 className={`text-xl font-black text-clay-text ${section.eyebrow ? "mt-2" : ""}`}>{translate(section.title)}</h3>}
+                  {section.body && <p className={`mt-3 whitespace-pre-line text-sm leading-6 text-clay-muted ${section.type === "quote" ? "text-lg italic" : ""}`}>{translate(section.body)}</p>}
+                  {showButtons && <SectionButton section={section} />}
                 </div>
               </GlassCard>
             )}

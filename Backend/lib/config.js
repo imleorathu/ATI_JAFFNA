@@ -8,8 +8,8 @@ const OPTIONAL_VARS = {
   NODE_ENV: "development",
   LOG_LEVEL: undefined,
   SEED_DEFAULT_ADMIN: "true",
-  DEFAULT_ADMIN_EMAIL: "admin@atijaffna.edu.lk",
-  DEFAULT_ADMIN_PASSWORD: "Admin@12345",
+  DEFAULT_ADMIN_EMAIL: "admin@gmail.com",
+  DEFAULT_ADMIN_PASSWORD: "123456",
   DEFAULT_ADMIN_NAME: "ATI Jaffna Admin",
   GROQ_API_KEY: undefined,
   GROQ_MODEL: "llama-3.3-70b-versatile",
@@ -29,9 +29,26 @@ const OPTIONAL_VARS = {
 
 function validateEnv() {
   const missing = REQUIRED_VARS.filter((key) => !process.env[key]);
+  const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI || OPTIONAL_VARS.MONGODB_URI;
+  const port = Number(process.env.PORT || OPTIONAL_VARS.PORT);
+
   if (missing.length) {
     logger.error("Missing required environment variables", { keys: missing });
     throw new Error(`Missing required env vars: ${missing.join(", ")}`);
+  }
+
+  if (!mongoUri) {
+    throw new Error("MONGO_URI or MONGODB_URI is required.");
+  }
+
+  try {
+    new URL(mongoUri);
+  } catch {
+    throw new Error("MONGO_URI/MONGODB_URI must be a valid MongoDB connection string.");
+  }
+
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+    throw new Error("PORT must be a valid TCP port between 1 and 65535.");
   }
 
   if (process.env.JWT_SECRET === "dev-secret" || process.env.JWT_SECRET?.length < 32) {
@@ -45,7 +62,7 @@ function validateEnv() {
 function getConfig() {
   const config = {
     port: parseInt(process.env.PORT || OPTIONAL_VARS.PORT, 10),
-    mongoUri: process.env.MONGODB_URI || OPTIONAL_VARS.MONGODB_URI,
+    mongoUri: process.env.MONGO_URI || process.env.MONGODB_URI || OPTIONAL_VARS.MONGODB_URI,
     clientUrl: process.env.CLIENT_URL || OPTIONAL_VARS.CLIENT_URL,
     nodeEnv: process.env.NODE_ENV || OPTIONAL_VARS.NODE_ENV,
     logLevel: process.env.LOG_LEVEL || OPTIONAL_VARS.LOG_LEVEL,

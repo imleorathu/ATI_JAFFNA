@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import GlassCard from "../../components/GlassCard";
 import { apiFetch } from "../../lib/api";
+import { useModal } from "../../contexts/ModalContext.jsx";
 
 const defaults = {
   general: {
@@ -141,6 +142,7 @@ function SwitchRow({ title, description, enabled, onChange }) {
 }
 
 export default function SettingsPage() {
+  const { confirm } = useModal();
   const [settings, setSettings] = useState(defaults);
   const [activeSection, setActiveSection] = useState("general");
   const [status, setStatus] = useState("");
@@ -234,8 +236,8 @@ export default function SettingsPage() {
     }
   };
 
-  const resetDefaults = () => {
-    const confirmed = window.confirm("Reset all settings to defaults?");
+  const resetDefaults = async () => {
+    const confirmed = await confirm({ title: "Reset settings?", message: "Restore every system setting to its default value?", confirmLabel: "Reset defaults", tone: "warning" });
     if (!confirmed) return;
     setSettings(defaults);
     setStatus("Defaults restored. Save to apply them.");

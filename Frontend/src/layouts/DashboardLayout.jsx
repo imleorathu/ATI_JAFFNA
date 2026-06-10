@@ -27,6 +27,7 @@ import {
   MessageSquare,
   Bot,
   Bell,
+  Home as HomeIcon,
   LogOut,
   Menu,
   X,
@@ -38,6 +39,10 @@ import {
   Sun
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import OrganizationBrand from "../components/OrganizationBrand.jsx";
+import LanguageSelector from "../components/LanguageSelector.jsx";
+import { useTheme } from "../contexts/ThemeContext.jsx";
+import { useLanguage } from "../contexts/LanguageContext.jsx";
 
 const drawerWidth = 268;
 
@@ -49,10 +54,9 @@ const roleNavLinks = {
     { to: "courses", label: "Courses", icon: BookOpen },
     { to: "attendance", label: "Attendance", icon: FileText },
     { to: "grades", label: "Grades", icon: BarChart3 },
+    { to: "fees", label: "Fees", icon: Wallet },
     { to: "ai-assistant", label: "AI Assistant", icon: Bot },
-    { to: "messages", label: "Department Messages", icon: MessageSquare },
-    { to: "settings", label: "Student Settings", icon: Settings },
-    { to: "fees", label: "Fees", icon: Wallet, partTimeOnly: true }
+    { to: "messages", label: "Department Messages", icon: MessageSquare }
   ],
   Faculty: [
     { to: "", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -68,25 +72,23 @@ const roleNavLinks = {
   ],
   Admin: [
     { to: "", label: "Dashboard", icon: LayoutDashboard, end: true },
-    { to: "courses", label: "Courses", icon: BookOpen },
-    { to: "assignments", label: "Assignments", icon: FileText },
-    { to: "ai-assistant", label: "AI Assistant", icon: Bot },
-    { to: "grades", label: "Grades", icon: BarChart3 },
-    { to: "messages", label: "Announcements", icon: Bell },
-    { to: "settings", label: "Settings", icon: Settings },
     { to: "users", label: "User Approvals", icon: UserCog },
-    { to: "students", label: "Students", icon: GraduationCap },
-    { to: "faculty", label: "Faculty", icon: User },
-    { to: "cms", label: "Website CMS", icon: FilePenLine },
-    { to: "analytics", label: "Analytics", icon: BarChart3 }
+    { to: "students", label: "Student Management", icon: GraduationCap },
+    { to: "faculty", label: "Faculty Management", icon: User },
+    { to: "grades", label: "Grade Management", icon: BarChart3 },
+    { to: "fees", label: "Part-Time Fees", icon: Wallet },
+    { to: "messages", label: "Admin Messages", icon: MessageSquare },
+    { to: "ai-assistant", label: "AI Assistant", icon: Bot },
+    { to: "cms", label: "Page Customization", icon: FilePenLine },
+    { to: "settings", label: "System Settings", icon: Settings }
   ],
-  Parent: [
+  Finance: [
     { to: "", label: "Dashboard", icon: LayoutDashboard, end: true },
-    { to: "student-progress", label: "Student Progress", icon: BarChart3 },
-    { to: "attendance", label: "Attendance", icon: FileText },
-    { to: "fees", label: "Fees", icon: Wallet },
-    { to: "messages", label: "Messages", icon: MessageSquare }
-  ]
+    { to: "fees", label: "Part-Time Fees", icon: Wallet },
+    { to: "analytics", label: "Finance Analytics", icon: BarChart3 },
+    { to: "messages", label: "Messages", icon: MessageSquare },
+    { to: "settings", label: "Settings", icon: Settings }
+  ],
 };
 
 const roleLabels = {
@@ -94,14 +96,15 @@ const roleLabels = {
   admin: "Admin",
   lecturer: "Faculty",
   faculty: "Faculty",
-  parent: "Parent"
+  department_staff: "Faculty",
+  finance_officer: "Finance",
 };
 
 const roleBasePaths = {
   Student: "/student",
   Admin: "/admin",
   Faculty: "/faculty",
-  Parent: "/parent"
+  Finance: "/finance",
 };
 
 function buildTheme(mode) {
@@ -154,14 +157,14 @@ function buildTheme(mode) {
 
 export default function DashboardLayout({ user, children }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [themeMode, setThemeMode] = useState(() => localStorage.getItem("atiPortalTheme") || "light");
+  const { themeMode, setThemeMode } = useTheme();
+  const { t, translate } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
 
   const role = roleLabels[String(user?.role || "student").toLowerCase()] || "Student";
-  const isPartTimeStudent = role === "Student" && String(user?.studentProfile?.studyMode || "").toLowerCase().replace(/\s+/g, "-") === "part-time";
-  const navLinks = (roleNavLinks[role] || roleNavLinks.Student).filter((item) => !item.partTimeOnly || isPartTimeStudent);
+  const navLinks = roleNavLinks[role] || roleNavLinks.Student;
   const basePath = roleBasePaths[role] || "/student";
   const displayName = user?.name || user?.email || "User";
   const theme = useMemo(() => buildTheme(themeMode), [themeMode]);
@@ -169,11 +172,6 @@ export default function DashboardLayout({ user, children }) {
   useEffect(() => {
     setDrawerOpen(false);
   }, [location.pathname]);
-
-  useEffect(() => {
-    localStorage.setItem("atiPortalTheme", themeMode);
-    document.documentElement.dataset.portalTheme = themeMode;
-  }, [themeMode]);
 
   const handleLogout = () => {
     logout();
@@ -195,24 +193,28 @@ export default function DashboardLayout({ user, children }) {
         }}
       >
         <Toolbar sx={{ minHeight: 64, px: { xs: 2, md: 3 }, gap: 2 }}>
-          <IconButton edge="start" onClick={() => setDrawerOpen(true)} sx={{ display: { md: "none" } }} aria-label="Open navigation">
+          <IconButton edge="start" onClick={() => setDrawerOpen(true)} sx={{ display: { md: "none" } }} aria-label={t("portal.openNav")}>
             <Menu size={22} />
           </IconButton>
+          <Box sx={{ display: { xs: "none", lg: "block" } }}>
+            <OrganizationBrand variant="topbar" showText={false} />
+          </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="caption" color="text.secondary" sx={{ display: { xs: "none", sm: "block" } }}>
-              {role} Portal
+              {translate(role)} {t("portal.portal")}
             </Typography>
             <Typography variant="h2" noWrap>
               {displayName}
             </Typography>
           </Box>
-          <Tooltip title={themeMode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+          <LanguageSelector compact />
+          <Tooltip title={themeMode === "dark" ? t("theme.switchLight") : t("theme.switchDark")}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "text.secondary" }}>
               {themeMode === "dark" ? <Moon size={17} /> : <Sun size={17} />}
               <Switch checked={themeMode === "dark"} onChange={(event) => setThemeMode(event.target.checked ? "dark" : "light")} />
             </Box>
           </Tooltip>
-          <Tooltip title="Notifications">
+          <Tooltip title={t("portal.notifications")}>
             <IconButton>
               <Badge badgeContent={0} color="primary">
                 <Bell size={20} />
@@ -274,36 +276,41 @@ export default function DashboardLayout({ user, children }) {
 }
 
 function SidebarContent({ navLinks, basePath, displayName, role, onLogout, onClose }) {
+  const { t, translate } = useLanguage();
   const resolveLink = (to) => (to ? `${basePath}/${to}` : basePath);
 
   return (
     <Box sx={{ display: "flex", minHeight: "100%", flexDirection: "column" }}>
       <Toolbar sx={{ minHeight: 64, gap: 1.5, borderBottom: "1px solid", borderColor: "divider", px: 2 }}>
-        <Avatar sx={{ bgcolor: "primary.main", width: 38, height: 38 }}>
-          <GraduationCap size={20} />
-        </Avatar>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography noWrap sx={{ fontWeight: 500, color: "text.primary" }}>
-            ATI Jaffna
-          </Typography>
-          <Typography variant="caption" noWrap sx={{ color: "text.secondary", textTransform: "uppercase", letterSpacing: ".08em" }}>
-            {role} Portal
+          <OrganizationBrand variant="portal" />
+          <Typography variant="caption" noWrap sx={{ display: "block", mt: 0.5, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".08em" }}>
+            {translate(role)} {t("portal.portal")}
           </Typography>
         </Box>
         {onClose && (
-          <IconButton onClick={onClose} size="small" aria-label="Close navigation">
+          <IconButton onClick={onClose} size="small" aria-label={t("portal.closeNav")}>
             <X size={18} />
           </IconButton>
         )}
       </Toolbar>
 
       <Box sx={{ flex: 1, overflowY: "auto", px: 1.5, py: 2 }}>
+        <NavLink to="/" className="material-nav-link">
+          {({ isActive }) => (
+            <Box className={isActive ? "material-nav-item active" : "material-nav-item"}>
+              <HomeIcon size={19} />
+              <span>University Website</span>
+            </Box>
+          )}
+        </NavLink>
+        <Box sx={{ my: 1.5, borderTop: "1px solid", borderColor: "divider" }} />
         {navLinks.map((link) => (
           <NavLink key={link.to || "/"} to={resolveLink(link.to)} end={link.end} className="material-nav-link">
             {({ isActive }) => (
               <Box className={isActive ? "material-nav-item active" : "material-nav-item"}>
                 <link.icon size={19} />
-                <span>{link.label}</span>
+                <span>{translate(link.label)}</span>
               </Box>
             )}
           </NavLink>
@@ -320,13 +327,13 @@ function SidebarContent({ navLinks, basePath, displayName, role, onLogout, onClo
               {displayName}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              Signed in
+              {t("portal.signedIn")}
             </Typography>
           </Box>
         </Box>
         <button type="button" onClick={onLogout} className="material-logout-button">
           <LogOut size={18} />
-          Logout
+          {t("portal.logout")}
         </button>
       </Box>
     </Box>

@@ -28,9 +28,6 @@ import User from "./models/User.js";
 // Load environment variables
 dotenv.config();
 
-// Validate environment before starting
-validateEnv();
-
 const config = getConfig();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -78,6 +75,18 @@ app.use(
       if (!origin) {
         callback(null, true);
         return;
+      }
+
+      if (config.nodeEnv === "development") {
+        try {
+          const { hostname } = new URL(origin);
+          if (["localhost", "127.0.0.1"].includes(hostname)) {
+            callback(null, true);
+            return;
+          }
+        } catch {
+          // Fall through to the configured allow-list.
+        }
       }
 
       if (config.allowedOrigins.includes(origin)) {
@@ -164,9 +173,25 @@ app.get("/api/health", async (req, res) => {
   const mongoose = (await import("mongoose")).default;
   const dbStates = ["disconnected", "connected", "connecting", "disconnecting"];
   const dbState = dbStates[mongoose.connection.readyState] || "unknown";
+  let dbPingMs = null;
+
+  if (mongoose.connection.readyState === 1) {
+    try {
+      const pingStart = Date.now();
+      await mongoose.connection.db.admin().ping();
+      dbPingMs = Date.now() - pingStart;
+    } catch {
+      dbPingMs = -1;
+    }
+  }
+
+  const databaseHealthy = dbState === "connected" && dbPingMs !== -1;
   
   const health = {
-    status: dbState === "connected" ? "healthy" : "degraded",
+    status: databaseHealthy ? "healthy" : "degraded",
+    api: "ok",
+    database: dbState,
+    dbName: mongoose.connection.name || null,
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: config.nodeEnv,
@@ -174,7 +199,12 @@ app.get("/api/health", async (req, res) => {
     services: {
       api: "ok",
       database: dbState,
-      dbName: mongoose.connection.name || null
+      dbName: mongoose.connection.name || null,
+      dbPingMs
+    },
+    checks: {
+      api: true,
+      database: databaseHealthy
     },
     memory: {
       rss: Math.round(process.memoryUsage().rss / 1024 / 1024),
@@ -312,24 +342,52 @@ const ensureLocalMongo = async () => {
 const ensureDefaultAdmin = async () => {
   if (!config.seedDefaultAdmin) return;
 
-  const existingAdmin = await User.exists({ role: "admin" });
-  if (existingAdmin) return;
+  logger.info("Checking default admin account");
 
-  const email = config.defaultAdminEmail;
+  const email = String(config.defaultAdminEmail || "").trim().toLowerCase();
   const password = config.defaultAdminPassword;
   const bcrypt = await import("bcryptjs");
+  const passwordHash = await bcrypt.default.hash(password, config.bcryptRounds);
+  const existingDefaultAdmin = await User.findOne({ email });
+
+  if (existingDefaultAdmin) {
+    existingDefaultAdmin.name = existingDefaultAdmin.name || config.defaultAdminName;
+    existingDefaultAdmin.role = "admin";
+    existingDefaultAdmin.accountStatus = "approved";
+
+    if (config.nodeEnv !== "production") {
+      existingDefaultAdmin.passwordHash = passwordHash;
+      existingDefaultAdmin.mustChangePassword = false;
+    }
+
+    await existingDefaultAdmin.save();
+    logger.info("Default admin account ready", { email });
+
+    if (config.nodeEnv === "production" && password === "123456") {
+      logger.warn("Default admin password is being used. Change it immediately!");
+    }
+    return;
+  }
+
+  const existingAdmin = await User.exists({ role: "admin" });
+  if (existingAdmin && config.nodeEnv === "production") {
+    return;
+  }
 
   await User.create({
     name: config.defaultAdminName,
     email,
-    passwordHash: await bcrypt.default.hash(password, config.bcryptRounds),
+    passwordHash,
     role: "admin",
-    accountStatus: "approved"
+    accountStatus: "approved",
+    adminProfile: {
+      designation: "Administrator"
+    }
   });
 
   logger.info("Created default admin account", { email });
-  
-  if (config.nodeEnv === "production" && password === "Admin@12345") {
+
+  if (config.nodeEnv === "production" && password === "123456") {
     logger.warn("Default admin password is being used. Change it immediately!");
   }
 };
@@ -338,8 +396,57 @@ const ensureDefaultAdmin = async () => {
 // SERVER STARTUP
 // ============================================================================
 
-async function startServer() {
+function mongoDbNameFromUri(uri) {
   try {
+    return new URL(uri).pathname.replace(/^\//, "") || "test";
+  } catch {
+    return "unknown";
+  }
+}
+
+function classifyStartupError(error) {
+  if (error?.name === "MongooseServerSelectionError") return "MongoDB connection error";
+  if (error?.name === "ValidationError") return "Mongoose schema validation error";
+  if (error?.code === 11000) return "MongoDB duplicate key error";
+  if (error?.code === "EADDRINUSE") return "HTTP port conflict";
+  if (/missing required env vars|JWT_SECRET|MONGO_URI|MONGODB_URI|PORT/i.test(error?.message || "")) {
+    return "Environment variable misconfiguration";
+  }
+  if (error instanceof TypeError || error instanceof ReferenceError) return "Undefined variable / null reference error";
+  return "Async startup failure";
+}
+
+function installProcessSafetyHandlers() {
+  process.on("uncaughtException", (error) => {
+    logger.error("Uncaught exception before graceful shutdown", {
+      category: classifyStartupError(error),
+      error: error.message,
+      stack: error.stack
+    });
+    process.exit(1);
+  });
+
+  process.on("unhandledRejection", (reason) => {
+    const error = reason instanceof Error ? reason : new Error(String(reason));
+    logger.error("Unhandled promise rejection", {
+      category: classifyStartupError(error),
+      error: error.message,
+      stack: error.stack
+    });
+  });
+}
+
+async function startServer() {
+  let server = null;
+  try {
+    validateEnv();
+
+    logger.info("Starting ATI Jaffna API", {
+      port: config.port,
+      db: mongoDbNameFromUri(config.mongoUri),
+      mongoUri: config.mongoUri.replace(/\/\/([^:@]+):([^@]+)@/, "//***:***@")
+    });
+
     await ensureLocalMongo();
     
     // Use the improved connectMongo from lib/mongo.js
@@ -347,11 +454,26 @@ async function startServer() {
     
     await ensureDefaultAdmin();
 
-    const server = app.listen(config.port, () => {
-      logger.info("ATI Jaffna API started", {
-        port: config.port,
-        env: config.nodeEnv,
-        url: `http://localhost:${config.port}`
+    server = await new Promise((resolve, reject) => {
+      const instance = app.listen(config.port, () => {
+        logger.info("ATI Jaffna API started", {
+          port: config.port,
+          env: config.nodeEnv,
+          db: mongoDbNameFromUri(config.mongoUri),
+          url: `http://localhost:${config.port}`
+        });
+        resolve(instance);
+      });
+
+      instance.once("error", reject);
+    });
+
+    server.on("error", (error) => {
+      logger.error("HTTP server error", {
+        category: classifyStartupError(error),
+        error: error.message,
+        code: error.code,
+        port: config.port
       });
     });
 
@@ -360,13 +482,28 @@ async function startServer() {
 
     return server;
   } catch (error) {
-    logger.error("Server startup failed", { 
+    logger.error("Server startup failed", {
+      category: classifyStartupError(error),
       error: error.message,
-      stack: error.stack 
+      stack: error.stack,
+      db: mongoDbNameFromUri(config.mongoUri),
+      port: config.port
     });
-    logger.error("Install/start MongoDB, or set MONGODB_URI to a reachable MongoDB connection string.");
+    if (error.name === "MongooseServerSelectionError") {
+      logger.error("Install/start MongoDB, or set MONGODB_URI to a reachable MongoDB connection string.");
+    }
+    if (error.code === "EADDRINUSE") {
+      logger.error("Server port is already in use", {
+        port: config.port,
+        fix: `Close the process using port ${config.port}, or set PORT to another value.`
+      });
+    }
+    if (server) {
+      await new Promise((resolve) => server.close(resolve)).catch(() => {});
+    }
     process.exit(1);
   }
 }
 
+installProcessSafetyHandlers();
 startServer();

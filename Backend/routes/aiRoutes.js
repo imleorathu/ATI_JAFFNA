@@ -2,7 +2,7 @@ import { Router } from "express";
 import fs from "fs";
 import multer from "multer";
 import path from "path";
-import { chatWithKnowledge, deleteKnowledgeDocument, listKnowledgeDocuments, updateKnowledgeDocument, uploadKnowledgeDocument } from "../controllers/aiController.js";
+import { chatWithKnowledge, deleteKnowledgeDocument, listKnowledgeDocuments, publicChat, updateKnowledgeDocument, uploadKnowledgeDocument } from "../controllers/aiController.js";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
@@ -26,6 +26,7 @@ router.get("/knowledge", requireAuth, listKnowledgeDocuments);
 router.post("/knowledge", requireAuth, upload.single("file"), uploadKnowledgeDocument);
 router.put("/knowledge/:id", requireAuth, updateKnowledgeDocument);
 router.delete("/knowledge/:id", requireAuth, deleteKnowledgeDocument);
+router.post("/public-chat", publicChat);
 router.post("/chat", requireAuth, chatWithKnowledge);
 
 export default router;

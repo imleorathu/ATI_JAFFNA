@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { BookOpen, CheckCircle2, GraduationCap, UserRound } from "lucide-react";
+import { BookOpen, CheckCircle2, GraduationCap, Mail, MapPin, Phone, UserRound } from "lucide-react";
 import GlassCard from "../../components/GlassCard";
 import { apiFetch } from "../../lib/api";
 
-export default function FacultyDashboard() {
+const profileFieldClass = "rounded-xl border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-3";
+
+export default function FacultyDashboard({ user }) {
   const [students, setStudents] = useState([]);
   const [faculty, setFaculty] = useState(null);
   const [scope, setScope] = useState("");
@@ -38,6 +40,16 @@ export default function FacultyDashboard() {
     }),
     [students]
   );
+
+  const staffProfile = user?.staffProfile || {};
+  const profile = {
+    name: user?.name || faculty?.fullName || "Staff Member",
+    email: user?.email || faculty?.email || "",
+    department: staffProfile?.department || faculty?.department || "",
+    staffType: staffProfile?.staffType || faculty?.staffType || "Staff",
+    phone: staffProfile?.phone || faculty?.phone || "",
+    office: staffProfile?.office || faculty?.office || ""
+  };
 
   return (
     <section className="space-y-6">
@@ -79,6 +91,34 @@ export default function FacultyDashboard() {
           </GlassCard>
         ))}
       </div>
+
+      <GlassCard className="p-5">
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="classroom-section-title">Staff Profile</h2>
+            <p className="portal-page-subtitle">Role-specific staff details from your database profile.</p>
+          </div>
+          <UserRound className="text-[color:var(--md-primary)]" size={22} />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            [UserRound, "Name", profile.name],
+            [Mail, "Email", profile.email],
+            [BookOpen, "Department", profile.department],
+            [GraduationCap, "Staff type", profile.staffType],
+            [Phone, "Contact", profile.phone],
+            [MapPin, "Office", profile.office]
+          ].map(([Icon, label, value]) => (
+            <div key={label} className={profileFieldClass}>
+              <div className="mb-2 flex items-center gap-2 text-[color:var(--md-text-secondary)]">
+                <Icon size={14} />
+                <span className="text-[11px] font-medium uppercase tracking-[0.12em]">{label}</span>
+              </div>
+              <p className="break-words text-sm font-medium text-[color:var(--md-text-primary)]">{value || "Not added"}</p>
+            </div>
+          ))}
+        </div>
+      </GlassCard>
 
       <GlassCard className="p-5">
         <div className="flex items-center justify-between gap-4">

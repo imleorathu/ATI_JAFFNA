@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Clock3, KeyRound, Mail, Pencil, Save, Search, ShieldCheck, Trash2, UserCog, X, XCircle } from "lucide-react";
 import GlassCard from "../../components/GlassCard";
 import { apiFetch, downloadCsv } from "../../lib/api";
+import { useModal } from "../../contexts/ModalContext.jsx";
 
-const roles = ["student", "lecturer", "admin"];
+const roles = ["student", "lecturer", "department_staff", "finance_officer", "admin"];
 const statuses = ["pending", "approved", "rejected"];
 
 const statusStyles = {
@@ -15,10 +16,27 @@ const statusStyles = {
 const roleLabels = {
   student: "Student",
   lecturer: "Lecturer",
+  department_staff: "Department Staff",
+  finance_officer: "Finance Officer",
   admin: "Admin"
 };
 
+const fallbackDepartments = [
+  "Higher National Diploma in Accountancy - (HNDA)",
+  "Higher National Diploma in English",
+  "Higher National Diploma in Engineering - Civil",
+  "Higher National Diploma in Engineering - Electrical",
+  "Higher National Diploma in Management - (HNDM)",
+  "Higher National Diploma in Information Technology - (HNDIT)",
+  "Higher National Diploma in Quantity Surveying"
+];
+
+function userDepartment(user) {
+  return user.studentProfile?.department || user.studentProfile?.program || user.staffProfile?.department || user.facultyProfile?.department || user.adminProfile?.department || "";
+}
+
 export default function UserManagement() {
+  const { confirm } = useModal();
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -26,7 +44,8 @@ export default function UserManagement() {
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [editingUser, setEditingUser] = useState(null);
-  const [editForm, setEditForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
+  const [editForm, setEditForm] = useState({ name: "", email: "", department: "", password: "", confirmPassword: "" });
+  const [departments, setDepartments] = useState(fallbackDepartments);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -44,6 +63,20 @@ export default function UserManagement() {
     loadUsers();
   }, []);
 
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        const records = await apiFetch("/api/departments");
+        const names = Array.isArray(records) ? records.map((department) => department.name).filter(Boolean) : [];
+        if (names.length) setDepartments(names);
+      } catch {
+        setDepartments(fallbackDepartments);
+      }
+    };
+
+    loadDepartments();
+  }, []);
+
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return users;
@@ -53,7 +86,7 @@ export default function UserManagement() {
         user.email,
         user.role,
         user.accountStatus,
-        user.studentProfile?.department,
+        userDepartment(user),
         user.studentProfile?.program,
         user.studentProfile?.studentId
       ]
@@ -95,7 +128,39 @@ export default function UserManagement() {
     setError("");
     setStatus("");
     setEditingUser(user);
-    setEditForm({ name: user.name || "", email: user.email || "", password: "", confirmPassword: "" });
+    setEditForm({ name: user.name || "", email: user.email || "", department: userDepartment(user), password: "", confirmPassword: "" });
+  };
+
+  const profilePatch = (user, department) => {
+    if (user.role === "student") {
+      return {
+        studentProfile: {
+          ...(user.studentProfile || {}),
+          department,
+          program: user.studentProfile?.program || department
+        }
+      };
+    }
+
+    if (user.role === "lecturer") {
+      return {
+        staffProfile: {
+          ...(user.staffProfile || user.facultyProfile || {}),
+          department
+        }
+      };
+    }
+
+    if (user.role === "admin") {
+      return {
+        adminProfile: {
+          ...(user.adminProfile || {}),
+          department
+        }
+      };
+    }
+
+    return {};
   };
 
   const saveAccountDetails = async (event) => {
@@ -108,7 +173,8 @@ export default function UserManagement() {
 
     const patch = {
       name: editForm.name,
-      email: editForm.email
+      email: editForm.email,
+      ...profilePatch(editingUser, editForm.department)
     };
     if (editForm.password) {
       patch.password = editForm.password;
@@ -118,13 +184,13 @@ export default function UserManagement() {
     const saved = await updateUser(editingUser, patch);
     if (saved) {
       setEditingUser(null);
-      setEditForm({ name: "", email: "", password: "", confirmPassword: "" });
+      setEditForm({ name: "", email: "", department: "", password: "", confirmPassword: "" });
       setStatus(`${saved.name || saved.email} updated successfully.`);
     }
   };
 
   const deleteUser = async (user) => {
-    if (!window.confirm(`Delete ${user.name || user.email}?`)) return;
+    if (!await confirm({ title: "Delete login account?", message: `Delete the login account for ${user.name || user.email}?`, confirmLabel: "Delete account", tone: "danger" })) return;
     setSavingId(user._id);
     setError("");
     try {
@@ -145,7 +211,7 @@ export default function UserManagement() {
         email: user.email,
         role: roleLabels[user.role] || user.role,
         status: user.accountStatus || "approved",
-        department: user.studentProfile?.department,
+        department: userDepartment(user),
         studentId: user.studentProfile?.studentId,
         registeredAt: user.createdAt
       }))
@@ -239,7 +305,7 @@ export default function UserManagement() {
                         </p>
                       </td>
                       <td className="py-3 pr-4">
-                        <p className="font-semibold text-[color:var(--md-text-secondary)]">{user.studentProfile?.department || "Not assigned"}</p>
+                        <p className="font-semibold text-[color:var(--md-text-secondary)]">{userDepartment(user) || "Not assigned"}</p>
                         <p className="mt-1 text-xs text-[color:var(--md-text-secondary)]">{user.studentProfile?.studentId || user._id}</p>
                       </td>
                       <td className="py-3 pr-4">
@@ -322,7 +388,7 @@ export default function UserManagement() {
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--md-primary)]">Edit Account</p>
                 <h2 className="mt-2 text-xl font-black text-[color:var(--md-text-primary)]">{roleLabels[editingUser.role] || "User"} credentials</h2>
-                <p className="portal-page-subtitle">Update Gmail/email and set a new password.</p>
+                <p className="portal-page-subtitle">Update account details, department, and password.</p>
               </div>
               <button
                 type="button"
@@ -356,6 +422,21 @@ export default function UserManagement() {
                     className="min-w-0 flex-1 bg-transparent text-sm text-[color:var(--md-text-primary)] outline-none"
                   />
                 </span>
+              </label>
+
+              <label className="block text-sm font-bold text-[color:var(--md-text-secondary)]">
+                Department
+                <select
+                  value={editForm.department}
+                  onChange={(event) => setEditForm((current) => ({ ...current, department: event.target.value }))}
+                  required={editingUser?.role !== "admin"}
+                  className="mt-2 w-full portal-input"
+                >
+                  <option value="">{editingUser?.role === "admin" ? "Not assigned" : "Select department"}</option>
+                  {departments.map((department) => (
+                    <option key={department} value={department}>{department}</option>
+                  ))}
+                </select>
               </label>
 
               <div className="grid gap-3 sm:grid-cols-2">

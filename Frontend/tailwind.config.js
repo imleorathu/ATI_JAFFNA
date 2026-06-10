@@ -3,7 +3,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"]
+        sans: ["Google Sans Text", "Google Sans", "Roboto", "Noto Sans", "Arial", "ui-sans-serif", "system-ui", "sans-serif"]
       },
       colors: {
         navy: "#071527",

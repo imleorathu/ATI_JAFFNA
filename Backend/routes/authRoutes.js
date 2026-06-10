@@ -2,7 +2,7 @@ import { Router } from "express";
 import fs from "fs";
 import multer from "multer";
 import path from "path";
-import { changePassword, login, register, updateProfilePhoto } from "../controllers/authController.js";
+import { changePassword, getProfile, login, register, updateProfilePhoto } from "../controllers/authController.js";
 import { requireAuth } from "../middleware/auth.js";
 import { authLimiter } from "../middleware/rateLimiter.js";
 
@@ -32,6 +32,7 @@ const upload = multer({
 
 router.post("/register", authLimiter, register);
 router.post("/login", authLimiter, login);
+router.get("/profile", requireAuth, getProfile);
 router.post("/change-password", requireAuth, changePassword);
 router.post("/profile-photo", requireAuth, upload.single("image"), updateProfilePhoto);
 

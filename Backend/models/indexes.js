@@ -38,7 +38,6 @@ async function ensureIndexes() {
     
     // Support student profile queries
     await userCollection.createIndex({ "studentProfile.studentId": 1 }, { 
-      sparse: true, 
       partialFilterExpression: { "studentProfile.studentId": { $exists: true } } 
     });
     
@@ -55,9 +54,8 @@ async function ensureIndexes() {
     // Support lookup by email or studentId
     await studentCollection.createIndex({ email: 1 }, { unique: true });
     await studentCollection.createIndex({ studentId: 1 }, { 
-      sparse: true, 
       unique: true,
-      partialFilterExpression: { studentId: { $exists: true, $ne: "" } }
+      partialFilterExpression: { studentId: { $gt: "" } }
     });
     
     // Support department-based queries (faculty scoping)
@@ -75,6 +73,13 @@ async function ensureIndexes() {
     
     // Support department-based scoping
     await facultyCollection.createIndex({ department: 1, staffType: 1 });
+    await facultyCollection.createIndex(
+      { department: 1 },
+      {
+        unique: true,
+        partialFilterExpression: { staffType: "Head of the department" }
+      }
+    );
 
     // =========================================================================
     // TimetableEntry indexes
@@ -139,6 +144,7 @@ async function ensureIndexes() {
     const contactCollection = mongoose.connection.collection("contacts");
     
     await contactCollection.createIndex({ department: 1, type: 1, createdAt: -1 });
+    await contactCollection.createIndex({ audience: 1, department: 1, status: 1, createdAt: -1 });
 
     // =========================================================================
     // PageContent indexes
@@ -146,6 +152,31 @@ async function ensureIndexes() {
     const pageContentCollection = mongoose.connection.collection("pagecontents");
     
     await pageContentCollection.createIndex({ slug: 1 }, { unique: true });
+
+    // =========================================================================
+    // PortalData indexes
+    // =========================================================================
+    const portalDataCollection = mongoose.connection.collection("portaldatas");
+
+    await portalDataCollection.createIndex({ key: 1 }, { unique: true });
+
+    // =========================================================================
+    // Part-time fee management indexes
+    // =========================================================================
+    await mongoose.connection.collection("feecategories").createIndex({ code: 1 }, { unique: true });
+    await mongoose.connection.collection("feestructures").createIndex({ departmentId: 1, academicYear: 1, semesterName: 1, isActive: 1 });
+    await mongoose.connection.collection("studentfees").createIndex({ departmentId: 1, status: 1, dueDate: 1 });
+    await mongoose.connection.collection("studentfees").createIndex({ student: 1, semesterName: 1, academicYear: 1 });
+    await mongoose.connection.collection("invoices").createIndex({ invoiceNumber: 1 }, { unique: true });
+    await mongoose.connection.collection("invoices").createIndex({ departmentId: 1, status: 1, dueDate: 1 });
+    await mongoose.connection.collection("payments").createIndex({ paymentNumber: 1 }, { unique: true });
+    await mongoose.connection.collection("payments").createIndex({ departmentId: 1, paymentDate: -1 });
+    await mongoose.connection.collection("receipts").createIndex({ receiptNumber: 1 }, { unique: true });
+    await mongoose.connection.collection("receipts").createIndex({ qrVerificationCode: 1 }, { unique: true });
+    await mongoose.connection.collection("refunds").createIndex({ refundNumber: 1 }, { unique: true });
+    await mongoose.connection.collection("refunds").createIndex({ departmentId: 1, status: 1, createdAt: -1 });
+    await mongoose.connection.collection("notifications").createIndex({ recipient: 1, status: 1, createdAt: -1 });
+    await mongoose.connection.collection("auditlogs").createIndex({ entityType: 1, entityId: 1, createdAt: -1 });
 
     console.log("All indexes created successfully");
     await mongoose.disconnect();

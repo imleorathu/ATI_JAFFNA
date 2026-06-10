@@ -23,6 +23,7 @@ import {
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import GlassCard from "../../components/GlassCard";
 import { apiFetch, downloadCsv } from "../../lib/api";
+import { useModal } from "../../contexts/ModalContext.jsx";
 
 const resources = [
   { key: "users", path: "/api/users" },
@@ -63,6 +64,34 @@ function dashboardCount(data, key) {
   return Array.isArray(data[key]) ? data[key].length : 0;
 }
 
+function formatUptime(seconds) {
+  if (!Number.isFinite(seconds)) return "Unknown uptime";
+  const totalSeconds = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  if (hours) return `${hours}h ${minutes}m`;
+  return `${minutes}m ${totalSeconds % 60}s`;
+}
+
+function normalizeHealth(payload) {
+  const apiState = payload?.api || payload?.services?.api || (payload?.status === "healthy" ? "ok" : "down");
+  const databaseState = typeof payload?.database === "string"
+    ? payload.database
+    : payload?.services?.database || payload?.database?.state || "unknown";
+
+  return {
+    raw: payload,
+    apiOk: payload?.checks?.api ?? apiState === "ok",
+    databaseOk: payload?.checks?.database ?? databaseState === "connected",
+    status: payload?.status || "unknown",
+    databaseState,
+    dbName: payload?.dbName || payload?.services?.dbName || payload?.database?.name || "Unknown",
+    uptime: formatUptime(payload?.uptime),
+    memoryMb: payload?.memory?.rss ?? payload?.memory?.rssMb ?? null,
+    checkedAt: payload?.timestamp ? formatDate(payload.timestamp) : "Not checked"
+  };
+}
+
 function MetricCard({ icon: Icon, label, value, detail, color }) {
   return (
     <GlassCard className="p-5">
@@ -80,7 +109,8 @@ function MetricCard({ icon: Icon, label, value, detail, color }) {
   );
 }
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ user }) {
+  const { confirm } = useModal();
   const navigate = useNavigate();
   const [data, setData] = useState(emptyData);
   const [loading, setLoading] = useState(true);
@@ -92,6 +122,29 @@ export default function AdminDashboard() {
   const [publishingBlog, setPublishingBlog] = useState(false);
   const [uploadingBlogImage, setUploadingBlogImage] = useState(false);
   const [health, setHealth] = useState(null);
+  const [healthLoading, setHealthLoading] = useState(false);
+
+  const loadHealth = async () => {
+    setHealthLoading(true);
+    try {
+      const result = await apiFetch("/api/health");
+      setHealth(normalizeHealth(result));
+    } catch (err) {
+      setHealth({
+        apiOk: false,
+        databaseOk: false,
+        status: "down",
+        databaseState: "unknown",
+        dbName: "Unknown",
+        uptime: "Unknown uptime",
+        memoryMb: null,
+        checkedAt: "Failed",
+        error: err?.message || "Unable to load system health."
+      });
+    } finally {
+      setHealthLoading(false);
+    }
+  };
 
   const loadDashboard = async () => {
     setLoading(true);
@@ -110,7 +163,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     loadDashboard();
-    apiFetch("/api/health").then(setHealth).catch(() => setHealth({ api: "down", database: "unknown" }));
+    loadHealth();
   }, []);
 
   const metrics = useMemo(() => {
@@ -140,6 +193,7 @@ export default function AdminDashboard() {
     { title: "Messages", detail: "Read contact requests", icon: Mail, route: "/admin/messages", count: dashboardCount(data, "contacts") },
     { title: "Settings", detail: "Portal configuration", icon: Settings, route: "/admin/settings", count: "Admin" }
   ];
+  const adminProfile = user?.adminProfile || {};
 
   const recentMessages = [...data.contacts].slice(0, 4);
   const recentNotices = [...data.notices].slice(0, 5);
@@ -166,7 +220,7 @@ export default function AdminDashboard() {
   };
 
   const deleteNotice = async (notice) => {
-    const confirmed = window.confirm(`Delete notice "${notice.title}"?`);
+    const confirmed = await confirm({ title: "Delete notice?", message: `Delete "${notice.title}" from the home page?`, confirmLabel: "Delete notice", tone: "danger" });
     if (!confirmed) return;
 
     setError("");
@@ -222,7 +276,7 @@ export default function AdminDashboard() {
   };
 
   const deleteBlog = async (blog) => {
-    const confirmed = window.confirm(`Delete blog "${blog.title}"?`);
+    const confirmed = await confirm({ title: "Delete blog?", message: `Delete "${blog.title}" from the news page?`, confirmLabel: "Delete blog", tone: "danger" });
     if (!confirmed) return;
 
     setError("");
@@ -266,10 +320,13 @@ export default function AdminDashboard() {
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={loadDashboard}
+                onClick={() => {
+                  loadDashboard();
+                  loadHealth();
+                }}
                 className="portal-btn"
               >
-                <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+                <RefreshCw size={16} className={loading || healthLoading ? "animate-spin" : ""} />
                 Refresh
               </button>
               <button
@@ -296,6 +353,21 @@ export default function AdminDashboard() {
             {status}
           </div>
         )}
+
+        <GlassCard className="p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="portal-page-label">Admin Profile</p>
+              <h2 className="classroom-section-title">{user?.name || "Administrator"}</h2>
+              <p className="portal-page-subtitle">{adminProfile?.designation || "Administrator"}{adminProfile?.department ? ` / ${adminProfile.department}` : ""}</p>
+            </div>
+            <div className="grid gap-2 text-sm text-[color:var(--md-text-secondary)] sm:text-right">
+              <span>{user?.email || "Email not added"}</span>
+              <span>{adminProfile?.phone || "Phone not added"}</span>
+              <span>{adminProfile?.office || "Office not added"}</span>
+            </div>
+          </div>
+        </GlassCard>
 
         <motion.div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.04 } } }}>
           {metrics.map((metric) => (
@@ -574,11 +646,21 @@ export default function AdminDashboard() {
           </GlassCard>
 
           <GlassCard className="p-5">
-            <h2 className="classroom-section-title">System Health</h2>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="classroom-section-title">System Health</h2>
+                <p className="text-xs text-[color:var(--md-text-secondary)]">
+                  {health?.error || `Database: ${health?.dbName || "Checking..."} | Uptime: ${health?.uptime || "Checking..."}`}
+                </p>
+              </div>
+              <button type="button" onClick={loadHealth} className="portal-icon-btn" aria-label="Refresh system health">
+                <RefreshCw size={16} className={healthLoading ? "animate-spin" : ""} />
+              </button>
+            </div>
             <div className="mt-4 space-y-3">
               {[
-                ["API connection", health?.api === "ok"],
-                ["Database", health?.database === "connected"],
+                ["API connection", Boolean(health?.apiOk)],
+                ["Database", Boolean(health?.databaseOk)],
                 ["Admin token", Boolean(localStorage.getItem("atiToken"))],
                 ["Dashboard data", !loading]
               ].map(([label, ok]) => (
@@ -590,6 +672,12 @@ export default function AdminDashboard() {
                   </span>
                 </div>
               ))}
+              <div className="grid gap-2 pt-2 text-xs text-[color:var(--md-text-secondary)] sm:grid-cols-2">
+                <span>Status: <strong className="capitalize text-[color:var(--md-text-primary)]">{health?.status || "checking"}</strong></span>
+                <span>DB state: <strong className="capitalize text-[color:var(--md-text-primary)]">{health?.databaseState || "checking"}</strong></span>
+                <span>Memory: <strong className="text-[color:var(--md-text-primary)]">{health?.memoryMb != null ? `${health.memoryMb} MB` : "Unknown"}</strong></span>
+                <span>Checked: <strong className="text-[color:var(--md-text-primary)]">{health?.checkedAt || "Checking..."}</strong></span>
+              </div>
             </div>
           </GlassCard>
         </div>

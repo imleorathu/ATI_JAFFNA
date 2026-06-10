@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Clock, FileText, CheckCircle, AlertTriangle, Monitor, Eye, Shield, Award, ChevronRight, Send } from "lucide-react";
 import GlassCard from "../../components/GlassCard";
-import { examSchedule, quizData } from "../../data";
+import { examSchedule as fallbackExamSchedule, quizData as fallbackQuizData } from "../../data";
+import usePortalData from "../../hooks/usePortalData";
 
 const statusConfig = {
   Scheduled: { class: "bg-blue-500/20 text-[color:var(--md-primary)] border-blue-500/30" },
@@ -98,6 +99,10 @@ const itemVariants = {
 };
 
 export default function ExamsPage() {
+  const { examSchedule = fallbackExamSchedule, quizData = fallbackQuizData } = usePortalData({
+    examSchedule: fallbackExamSchedule,
+    quizData: fallbackQuizData
+  });
   const [activeTab, setActiveTab] = useState("exams");
   const [selectedQuizId, setSelectedQuizId] = useState(null);
   const [quizPhase, setQuizPhase] = useState("select");

@@ -1,20 +1,23 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   BookOpen,
-  CheckCircle2,
+  Eye,
+  EyeOff,
   GraduationCap,
   LockKeyhole,
   Mail,
   Phone,
   ShieldCheck,
+  Sparkles,
   UserRound,
   UsersRound
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx";
-import GlassCard from "../components/GlassCard.jsx";
-import SectionHeader from "../components/SectionHeader.jsx";
+import OrganizationBrand from "../components/OrganizationBrand.jsx";
+import { useLanguage } from "../contexts/LanguageContext.jsx";
 
 const portalPathForRole = (role) => {
   const normalized = String(role || "student").toLowerCase();
@@ -34,7 +37,6 @@ const hndProgrammes = [
 ];
 
 const modeOptions = ["Full-time", "Part-time"];
-const hnditProgramme = "Higher National Diploma in Information Technology - (HNDIT)";
 const hnditAcademicStages = [
   "First year Full Time",
   "Second year Full Time",
@@ -59,33 +61,67 @@ const initialForm = {
 };
 
 function FieldShell({ label, icon: Icon, children }) {
+  const { translate } = useLanguage();
   return (
-    <label className="block text-sm font-semibold text-clay-text">
-      {label}
-      <span className="mt-2 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-[var(--clay-inset)] focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/10">
-        <Icon size={18} className="shrink-0 text-clay-accent" />
+    <label className="register-field">
+      <span>{translate(label)}</span>
+      <div className="register-input-wrap">
+        <Icon size={18} />
         {children}
-      </span>
+      </div>
     </label>
   );
 }
 
-const controlClass = "min-w-0 flex-1 bg-transparent text-clay-text outline-none placeholder:text-slate-400";
+const controlClass = "register-control";
+
+const cardEntrance = {
+  hidden: { opacity: 0, y: 28, scale: 0.975 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { type: "spring", stiffness: 120, damping: 19, mass: 0.85, staggerChildren: 0.08 }
+  }
+};
+
+const panelEntrance = {
+  hidden: (direction) => ({ opacity: 0, x: direction * 30 }),
+  visible: { opacity: 1, x: 0, transition: { duration: 0.48, ease: [0.16, 1, 0.3, 1] } }
+};
+
+const formEntrance = {
+  hidden: {},
+  visible: { transition: { delayChildren: 0.16, staggerChildren: 0.045 } }
+};
+
+const fieldEntrance = {
+  hidden: { opacity: 0, y: 12 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.32, ease: "easeOut" } }
+};
 
 export default function Register() {
   const [form, setForm] = useState(initialForm);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
+  const { t, translate } = useLanguage();
 
   const setField = (field, value) => {
     setForm((current) => {
       const next = { ...current, [field]: value };
       if (field === "department") {
         next.program = value;
-        next.academicStage = value === hnditProgramme ? next.academicStage : "";
+      }
+      if (field === "studyMode") {
+        const incompatibleStage = value === "Full-time" ? "Part Time" : "Full Time";
+        if (next.academicStage.includes(incompatibleStage)) {
+          next.academicStage = hnditAcademicStages.find((stage) => stage.includes(value === "Full-time" ? "Full Time" : "Part Time")) || "";
+        }
       }
       if (field === "academicStage") {
         next.studyMode = value.includes("Part Time") ? "Part-time" : "Full-time";
@@ -122,37 +158,36 @@ export default function Register() {
   };
 
   return (
-    <section className="page-section min-h-screen bg-gradient-to-b from-[#f7fbff] via-[#f0f4f8] to-[#e8edf2] pt-32">
-      <div className="mx-auto max-w-7xl">
-        <SectionHeader
-          eyebrow="Register"
-          title="Create your ATI portal account"
-          text="Build a complete student profile with academic pathway, department, intake, and emergency contact details."
-        />
-        <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[0.8fr_1.2fr]">
-          <GlassCard className="h-full">
-            <h3 className="text-xl font-black text-clay-text">Student portal benefits</h3>
-            <div className="mt-5 grow space-y-3 text-sm text-clay-muted">
-              {[
-                "Department and programme mapped at signup",
-                "Student profile appears in admin records",
-                "Guardian contact ready for campus communication",
-                "Attendance, grades, LMS, and fees linked to one account"
-              ].map((item) => (
-                <p key={item} className="flex gap-2">
-                  <CheckCircle2 className="shrink-0 text-clay-accent" size={18} />
-                  {item}
-                </p>
-              ))}
-            </div>
-          </GlassCard>
+    <section className="register-page-shell">
+      <motion.div className="login-page-orb login-page-orb-one" animate={{ x: [0, 18, 0], y: [0, -12, 0] }} transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }} />
+      <motion.div className="login-page-orb login-page-orb-two" animate={{ x: [0, -16, 0], y: [0, 14, 0] }} transition={{ duration: 11, repeat: Infinity, ease: "easeInOut" }} />
+      <motion.div className="register-card" variants={cardEntrance} initial="hidden" animate="visible">
+        <motion.aside className="register-brand-panel" custom={-1} variants={panelEntrance}>
+          <div>
+            <OrganizationBrand variant="login" />
+            <p className="login-eyebrow">
+              <Sparkles size={15} />
+              {t("auth.official")}
+            </p>
+            <h1>{t("auth.registerTitle")}</h1>
+            <p className="login-brand-copy">{t("auth.registerText")}</p>
+          </div>
 
-          <GlassCard className="h-full">
-            <h3 className="text-xl font-black text-clay-text">Request access</h3>
-            <p className="mt-2 text-sm leading-6 text-clay-muted">Create an active student account with academic details.</p>
-            <form onSubmit={handleSubmit} className="mt-5 space-y-5">
-              <div className="grid gap-4 md:grid-cols-2">
-                <FieldShell label="Full name" icon={UserRound}>
+          <div className="login-security-note">
+            <ShieldCheck size={19} />
+            <span>Create one secure account for ATI Jaffna portal access.</span>
+          </div>
+        </motion.aside>
+
+        <motion.div className="register-form-panel" custom={1} variants={panelEntrance}>
+          <div className="login-form-heading">
+            <p>{t("nav.register")}</p>
+            <h2>{t("auth.requestAccess")}</h2>
+            <span>{t("auth.requestAccessText")}</span>
+          </div>
+          <motion.form onSubmit={handleSubmit} className="register-form" variants={formEntrance}>
+              <motion.div className="register-form-grid" variants={formEntrance}>
+                <motion.div variants={fieldEntrance}><FieldShell label="Full name" icon={UserRound}>
                   <input
                     type="text"
                     value={form.name}
@@ -161,19 +196,20 @@ export default function Register() {
                     placeholder="Your full name"
                     className={controlClass}
                   />
-                </FieldShell>
+                </FieldShell></motion.div>
 
-                <FieldShell label="Student ID" icon={ShieldCheck}>
+                <motion.div variants={fieldEntrance}><FieldShell label="Student ID" icon={ShieldCheck}>
                   <input
                     type="text"
                     value={form.studentId}
                     onChange={(event) => setField("studentId", event.target.value)}
+                    required
                     placeholder="ATI/ST/2026/001"
                     className={controlClass}
                   />
-                </FieldShell>
+                </FieldShell></motion.div>
 
-                <FieldShell label="NIC" icon={ShieldCheck}>
+                <motion.div variants={fieldEntrance}><FieldShell label="NIC" icon={ShieldCheck}>
                   <input
                     type="text"
                     value={form.nic}
@@ -182,9 +218,9 @@ export default function Register() {
                     placeholder="200012345678 or 901234567V"
                     className={controlClass}
                   />
-                </FieldShell>
+                </FieldShell></motion.div>
 
-                <FieldShell label="Email address" icon={Mail}>
+                <motion.div variants={fieldEntrance}><FieldShell label="Email address" icon={Mail}>
                   <input
                     type="email"
                     value={form.email}
@@ -194,9 +230,9 @@ export default function Register() {
                     placeholder="you@atijaffna.edu.lk"
                     className={controlClass}
                   />
-                </FieldShell>
+                </FieldShell></motion.div>
 
-                <FieldShell label="Phone number" icon={Phone}>
+                <motion.div variants={fieldEntrance}><FieldShell label="Phone number" icon={Phone}>
                   <input
                     type="tel"
                     value={form.phone}
@@ -204,9 +240,9 @@ export default function Register() {
                     placeholder="+94 77 123 4567"
                     className={controlClass}
                   />
-                </FieldShell>
+                </FieldShell></motion.div>
 
-                <FieldShell label="Department / HND programme" icon={GraduationCap}>
+                <motion.div variants={fieldEntrance} className="register-field-wide"><FieldShell label="Department / HND programme" icon={GraduationCap}>
                   <select
                     value={form.department}
                     onChange={(event) => setField("department", event.target.value)}
@@ -220,41 +256,40 @@ export default function Register() {
                       </option>
                     ))}
                   </select>
-                </FieldShell>
+                </FieldShell></motion.div>
 
-                <FieldShell label="Study mode" icon={BookOpen}>
+                <motion.div variants={fieldEntrance}><FieldShell label="Study mode" icon={BookOpen}>
                   <select
                     value={form.studyMode}
                     onChange={(event) => setField("studyMode", event.target.value)}
+                    required
                     className={controlClass}
                   >
                     {modeOptions.map((mode) => (
                       <option key={mode} value={mode}>
-                        {mode}
+                        {mode === "Full-time" ? "Full Time" : "Part Time"}
                       </option>
                     ))}
                   </select>
-                </FieldShell>
+                </FieldShell></motion.div>
 
-                {form.department === hnditProgramme && (
-                  <FieldShell label="HNDIT student group" icon={BookOpen}>
-                    <select
-                      value={form.academicStage}
-                      onChange={(event) => setField("academicStage", event.target.value)}
-                      required
-                      className={controlClass}
-                    >
-                      <option value="">Select year and study type</option>
-                      {hnditAcademicStages.map((stage) => (
-                        <option key={stage} value={stage}>
-                          {stage}
-                        </option>
-                      ))}
-                    </select>
-                  </FieldShell>
-                )}
+                <motion.div variants={fieldEntrance} className="register-field-wide"><FieldShell label="Current Study year" icon={BookOpen}>
+                  <select
+                    value={form.academicStage}
+                    onChange={(event) => setField("academicStage", event.target.value)}
+                    required
+                    className={controlClass}
+                  >
+                    <option value="">Select current study year</option>
+                    {hnditAcademicStages.map((stage) => (
+                      <option key={stage} value={stage}>
+                        {stage}
+                      </option>
+                    ))}
+                  </select>
+                </FieldShell></motion.div>
 
-                <FieldShell label="Guardian name" icon={UsersRound}>
+                <motion.div variants={fieldEntrance}><FieldShell label="Guardian name" icon={UsersRound}>
                   <input
                     type="text"
                     value={form.guardianName}
@@ -262,9 +297,9 @@ export default function Register() {
                     placeholder="Parent or guardian"
                     className={controlClass}
                   />
-                </FieldShell>
+                </FieldShell></motion.div>
 
-                <FieldShell label="Guardian phone" icon={Phone}>
+                <motion.div variants={fieldEntrance}><FieldShell label="Guardian phone" icon={Phone}>
                   <input
                     type="tel"
                     value={form.guardianPhone}
@@ -272,12 +307,12 @@ export default function Register() {
                     placeholder="+94 77 765 4321"
                     className={controlClass}
                   />
-                </FieldShell>
+                </FieldShell></motion.div>
 
-                <div className="md:col-span-2">
+                <motion.div className="md:col-span-2" variants={fieldEntrance}>
                   <FieldShell label="Password" icon={LockKeyhole}>
                     <input
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       value={form.password}
                       onChange={(event) => setField("password", event.target.value)}
                       required
@@ -286,13 +321,21 @@ export default function Register() {
                       placeholder="Minimum 8 characters"
                       className={controlClass}
                     />
+                    <button
+                      type="button"
+                      className="register-password-toggle"
+                      onClick={() => setShowPassword((current) => !current)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                   </FieldShell>
-                </div>
+                </motion.div>
 
-                <div className="md:col-span-2">
+                <motion.div className="md:col-span-2" variants={fieldEntrance}>
                   <FieldShell label="Confirm password" icon={LockKeyhole}>
                     <input
-                      type="password"
+                      type={showConfirmPassword ? "text" : "password"}
                       value={form.confirmPassword}
                       onChange={(event) => setField("confirmPassword", event.target.value)}
                       required
@@ -301,40 +344,43 @@ export default function Register() {
                       placeholder="Re-enter password"
                       className={controlClass}
                     />
+                    <button
+                      type="button"
+                      className="register-password-toggle"
+                      onClick={() => setShowConfirmPassword((current) => !current)}
+                      aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                    >
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                   </FieldShell>
-                </div>
-              </div>
+                </motion.div>
+              </motion.div>
 
               {error && (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                <div className="register-message register-message-error">
                   {error}
                 </div>
               )}
               {success && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                <div className="register-message register-message-success">
                   {success}
                 </div>
               )}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="clay-btn-primary w-full gap-2 py-3 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {loading ? "Creating account..." : "Submit registration"}
+              <motion.button type="submit" disabled={loading} className="login-submit-button" variants={fieldEntrance} whileHover={{ y: -2 }} whileTap={{ scale: 0.985 }}>
+                {loading ? t("auth.creatingAccount") : t("auth.submitRegistration")}
                 {!loading && <ArrowRight size={17} />}
-              </button>
+              </motion.button>
 
-              <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 text-sm text-clay-muted sm:flex-row sm:items-center sm:justify-between">
-                <p>Already have an account?</p>
-                <Link to="/login" className="font-bold text-clay-accent transition hover:text-blue-700">
-                  Sign in
+              <motion.div className="login-register-row" variants={fieldEntrance}>
+                <p>{t("auth.hasAccount")}</p>
+                <Link to="/login">
+                  {t("auth.signIn")}
                 </Link>
-              </div>
-            </form>
-          </GlassCard>
-        </div>
-      </div>
+              </motion.div>
+          </motion.form>
+        </motion.div>
+      </motion.div>
     </section>
   );
 }

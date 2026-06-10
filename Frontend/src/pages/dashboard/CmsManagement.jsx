@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Copy, Download, ExternalLink, Eye, EyeOff, FilePenLine, FileUp, Globe2, Plus, RotateCcw, Save, Send, Trash2, Upload } from "lucide-react";
 import GlassCard from "../../components/GlassCard";
 import { apiFetch } from "../../lib/api";
+import { useModal } from "../../contexts/ModalContext.jsx";
 
-const editablePages = [
+const baseEditablePages = [
   ["home", "Home"],
   ["about", "About"],
   ["faculties", "Faculties"],
@@ -11,6 +12,12 @@ const editablePages = [
   ["news", "News"],
   ["contact", "Contact"]
 ];
+
+function publicPathForPage(pageOrSlug) {
+  const slug = typeof pageOrSlug === "string" ? pageOrSlug : pageOrSlug?.slug;
+  if (slug === "home") return "/";
+  return `/${slug}`;
+}
 
 const emptyDraft = {
   heroTitle: "",
@@ -75,7 +82,24 @@ function normalizeDraft(draft = {}) {
   };
 }
 
+function hasDraftContent(draft = {}) {
+  return Boolean(
+    draft.heroTitle ||
+    draft.heroDescription ||
+    draft.heroImageUrl ||
+    draft.seoTitle ||
+    draft.seoDescription ||
+    draft.sections?.length
+  );
+}
+
+function draftForCmsPage(slug, page) {
+  if (page?.draft && hasDraftContent(page.draft)) return normalizeDraft(page.draft);
+  return normalizeDraft(page?.draft);
+}
+
 export default function CmsManagement() {
+  const { confirm } = useModal();
   const [pages, setPages] = useState([]);
   const [selectedSlug, setSelectedSlug] = useState("home");
   const [draft, setDraft] = useState(emptyDraft);
@@ -88,10 +112,18 @@ export default function CmsManagement() {
   const [templateKey, setTemplateKey] = useState("blank");
 
   const selectedPage = useMemo(
-    () => pages.find((page) => page.slug === selectedSlug) || { slug: selectedSlug, title: editablePages.find(([slug]) => slug === selectedSlug)?.[1] || selectedSlug },
+    () => pages.find((page) => page.slug === selectedSlug) || { slug: selectedSlug, title: baseEditablePages.find(([slug]) => slug === selectedSlug)?.[1] || selectedSlug, status: "draft" },
     [pages, selectedSlug]
   );
   const selectedTemplate = useMemo(() => sectionTemplates.find(([key]) => key === templateKey) || sectionTemplates[0], [templateKey]);
+  const mainPages = useMemo(() => {
+    const baseSlugs = new Set(baseEditablePages.map(([slug]) => slug));
+    const otherDynamicPages = pages
+      .filter((page) => !baseSlugs.has(page.slug) && !page.slug.startsWith("faculty-details-"))
+      .sort((a, b) => String(a.title || a.slug).localeCompare(String(b.title || b.slug)))
+      .map((page) => [page.slug, page.title || page.slug]);
+    return [...baseEditablePages, ...otherDynamicPages];
+  }, [pages]);
 
   const loadPages = async () => {
     setLoading(true);
@@ -102,7 +134,7 @@ export default function CmsManagement() {
       const current = result.find((page) => page.slug === selectedSlug) || result[0];
       if (current) {
         setSelectedSlug(current.slug);
-        setDraft(normalizeDraft(current.draft));
+        setDraft(draftForCmsPage(current.slug, current));
         setDirty(false);
       }
     } catch (err) {
@@ -127,11 +159,11 @@ export default function CmsManagement() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [dirty]);
 
-  const selectPage = (slug) => {
-    if (dirty && !window.confirm("You have unsaved CMS changes. Switch pages and discard them?")) return;
+  const selectPage = async (slug) => {
+    if (dirty && !await confirm({ title: "Discard unsaved changes?", message: "Switch pages and discard the current CMS draft changes?", confirmLabel: "Discard changes", tone: "warning" })) return;
     const page = pages.find((item) => item.slug === slug);
     setSelectedSlug(slug);
-    setDraft(normalizeDraft(page?.draft));
+    setDraft(draftForCmsPage(slug, page));
     setPreview(false);
     setStatus("");
     setError("");
@@ -170,8 +202,8 @@ export default function CmsManagement() {
     setDirty(true);
   };
 
-  const removeSection = (index) => {
-    if (!window.confirm(`Delete section ${index + 1}?`)) return;
+  const removeSection = async (index) => {
+    if (!await confirm({ title: "Delete section?", message: `Delete section ${index + 1} from this draft?`, confirmLabel: "Delete section", tone: "danger" })) return;
     setDraft((current) => ({
       ...current,
       sections: current.sections.filter((_, sectionIndex) => sectionIndex !== index)
@@ -200,16 +232,16 @@ export default function CmsManagement() {
     setDirty(true);
   };
 
-  const restorePublished = () => {
+  const restorePublished = async () => {
     if (!selectedPage?.publishedAt) return;
-    if (!window.confirm("Replace the current draft with the live published content?")) return;
+    if (!await confirm({ title: "Restore published content?", message: "Replace the current draft with the live published content?", confirmLabel: "Restore content", tone: "warning" })) return;
     setDraft(normalizeDraft(selectedPage.published));
     setDirty(true);
     setStatus("Published content restored into the draft editor.");
   };
 
-  const resetDraft = () => {
-    if (!window.confirm("Clear this draft content? Published content will not be changed until you publish again.")) return;
+  const resetDraft = async () => {
+    if (!await confirm({ title: "Clear this draft?", message: "Published content stays live until you publish again.", confirmLabel: "Clear draft", tone: "danger" })) return;
     setDraft(emptyDraft);
     setPreview(false);
     setDirty(true);
@@ -217,7 +249,7 @@ export default function CmsManagement() {
   };
 
   const openPublicPage = () => {
-    const path = selectedSlug === "home" ? "/" : `/${selectedSlug}`;
+    const path = publicPathForPage(selectedPage);
     window.open(path, "_blank", "noopener,noreferrer");
   };
 
@@ -240,12 +272,21 @@ export default function CmsManagement() {
     }
   };
 
+  const mergeUpdatedPage = (updated) => {
+    setPages((current) => {
+      const exists = current.some((page) => page.slug === updated.slug);
+      return exists
+        ? current.map((page) => (page.slug === updated.slug ? updated : page))
+        : [...current, updated];
+    });
+  };
+
   const persistDraft = async () => {
     const updated = await apiFetch(`/api/cms/pages/${selectedSlug}/draft`, {
       method: "PUT",
       body: JSON.stringify({ title: selectedPage.title, draft })
     });
-    setPages((current) => current.map((page) => (page.slug === updated.slug ? updated : page)));
+    mergeUpdatedPage(updated);
     setDraft(normalizeDraft(updated.draft));
     setDirty(false);
     return updated;
@@ -272,7 +313,7 @@ export default function CmsManagement() {
     try {
       await persistDraft();
       const updated = await apiFetch(`/api/cms/pages/${selectedSlug}/publish`, { method: "POST" });
-      setPages((current) => current.map((page) => (page.slug === updated.slug ? updated : page)));
+      mergeUpdatedPage(updated);
       setDirty(false);
       setStatus("Page published.");
     } catch (err) {
@@ -283,13 +324,13 @@ export default function CmsManagement() {
   };
 
   const unpublish = async () => {
-    if (!window.confirm("Unpublish this page CMS content from the public website?")) return;
+    if (!await confirm({ title: "Unpublish page?", message: "Remove this CMS content from the public website?", confirmLabel: "Unpublish", tone: "warning" })) return;
     setSaving(true);
     setError("");
     setStatus("");
     try {
       const updated = await apiFetch(`/api/cms/pages/${selectedSlug}/unpublish`, { method: "POST" });
-      setPages((current) => current.map((page) => (page.slug === updated.slug ? updated : page)));
+      mergeUpdatedPage(updated);
       setStatus("Page unpublished.");
     } catch (err) {
       setError(err?.message || "Unable to unpublish page.");
@@ -388,7 +429,7 @@ export default function CmsManagement() {
         <GlassCard className="p-4">
           <h2 className="mb-3 text-sm font-black uppercase tracking-[0.14em] text-[color:var(--md-text-secondary)]">Pages</h2>
           <div className="space-y-2">
-            {editablePages.map(([slug, title]) => {
+            {mainPages.map(([slug, title]) => {
               const page = pages.find((item) => item.slug === slug);
               const active = selectedSlug === slug;
               return (

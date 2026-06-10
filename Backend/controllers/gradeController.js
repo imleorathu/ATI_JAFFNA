@@ -1,9 +1,7 @@
-import Faculty from "../models/Faculty.js";
 import GradeRecord from "../models/GradeRecord.js";
 import Student from "../models/Student.js";
 import User from "../models/User.js";
-
-const departmentBasedFacultyTypes = ["Teaching Staff", "Head of the department"];
+import { getDepartmentScope } from "../middleware/departmentAccess.js";
 
 function gradeFromScore(score) {
   const value = Number(score);
@@ -20,18 +18,7 @@ function gradeFromScore(score) {
   return "F";
 }
 
-async function facultyScope(req) {
-  const user = await User.findById(req.user.id).select("email");
-  if (!user) return { error: "User account not found." };
-
-  const faculty = await Faculty.findOne({ email: String(user.email || "").trim().toLowerCase() });
-  if (!faculty) return { error: "Faculty profile not found for this account." };
-  if (!departmentBasedFacultyTypes.includes(faculty.staffType) || !faculty.department) {
-    return { error: "This staff account is not assigned to a student department." };
-  }
-
-  return { faculty, department: faculty.department };
-}
+const facultyScope = getDepartmentScope;
 
 async function studentForUser(req) {
   const user = await User.findById(req.user.id).select("email studentProfile");

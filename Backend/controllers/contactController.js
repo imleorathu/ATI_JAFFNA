@@ -1,22 +1,11 @@
 import Contact from "../models/Contact.js";
-import Faculty from "../models/Faculty.js";
 import Student from "../models/Student.js";
 import User from "../models/User.js";
+import { getDepartmentScope } from "../middleware/departmentAccess.js";
 
-const departmentBasedFacultyTypes = ["Teaching Staff", "Head of the department"];
-
-async function facultyScope(req) {
-  const user = await User.findById(req.user.id).select("email");
-  if (!user) return { error: "User account not found." };
-
-  const faculty = await Faculty.findOne({ email: String(user.email || "").trim().toLowerCase() });
-  if (!faculty) return { error: "Faculty profile not found for this account." };
-  if (!departmentBasedFacultyTypes.includes(faculty.staffType) || !faculty.department) {
-    return { error: "This staff account is not assigned to a student department." };
-  }
-
-  return { faculty, department: faculty.department };
-}
+const facultyScope = getDepartmentScope;
+const CONTACT_AUDIENCES = ["admin", "department"];
+const DEPARTMENT_MESSAGE_ROLES = ["lecturer", "department_staff"];
 
 async function studentForUser(req) {
   const user = await User.findById(req.user.id).select("email studentProfile name");
@@ -24,6 +13,46 @@ async function studentForUser(req) {
   const email = String(user.email || "").trim().toLowerCase();
   const studentId = String(user.studentProfile?.studentId || "").trim();
   return Student.findOne({ $or: [{ email }, ...(studentId ? [{ studentId }] : [])] });
+}
+
+export function normalizeContactAudience(value, fallback = "admin") {
+  const audience = String(value || "").trim().toLowerCase();
+  return CONTACT_AUDIENCES.includes(audience) ? audience : fallback;
+}
+
+export function getContactAudience(record) {
+  if (record?.audience) return normalizeContactAudience(record.audience);
+  return record?.type === "complaint" ? "department" : "admin";
+}
+
+export function contactIsVisibleToScope(record, scope = {}) {
+  const audience = getContactAudience(record);
+  const role = String(scope.role || "").toLowerCase();
+
+  if (role === "admin") return audience === "admin";
+  if (DEPARTMENT_MESSAGE_ROLES.includes(role)) return audience === "department" && record.department === scope.department;
+  if (role === "student") return String(record.student || "") === String(scope.studentId || "");
+  return false;
+}
+
+function adminMessageQuery() {
+  return {
+    $or: [
+      { audience: "admin" },
+      { audience: { $exists: false }, type: { $ne: "complaint" } }
+    ]
+  };
+}
+
+function departmentMessageQuery(department) {
+  return {
+    department,
+    type: "complaint",
+    $or: [
+      { audience: "department" },
+      { audience: { $exists: false } }
+    ]
+  };
 }
 
 function contactResponse(record) {
@@ -34,6 +63,7 @@ function contactResponse(record) {
     subject: record.subject,
     message: record.message,
     type: record.type,
+    audience: getContactAudience(record),
     department: record.department,
     student: record.student,
     studentName: record.studentName,
@@ -51,19 +81,20 @@ function contactResponse(record) {
 
 export async function listContacts(req, res, next) {
   try {
-    const query = {};
+    let query = {};
 
-    if (req.user?.role === "lecturer") {
+    if (DEPARTMENT_MESSAGE_ROLES.includes(req.user?.role)) {
       const scope = await facultyScope(req);
       if (scope.error) return res.status(403).json({ message: scope.error });
-      query.department = scope.department;
-      query.type = "complaint";
+      query = departmentMessageQuery(scope.department);
     } else if (req.user?.role === "student") {
       const student = await studentForUser(req);
       if (!student) return res.json([]);
       query.student = student._id;
     } else if (req.user?.role !== "admin") {
       return res.status(403).json({ message: "Message access is limited to students, faculty, and admins." });
+    } else {
+      query = adminMessageQuery();
     }
 
     const records = await Contact.find(query).sort({ createdAt: -1 });
@@ -81,6 +112,7 @@ export async function createContact(req, res, next) {
       subject: String(req.body.subject || "").trim(),
       message: String(req.body.message || "").trim(),
       type: req.user?.role === "student" ? "complaint" : "contact",
+      audience: "admin",
       department: String(req.body.department || "").trim(),
       priority: req.body.priority || "normal",
       category: req.body.category || "general"
@@ -89,11 +121,13 @@ export async function createContact(req, res, next) {
     if (req.user?.role === "student") {
       const student = await studentForUser(req);
       if (!student) return res.status(404).json({ message: "Student profile not found for this account." });
+      const audience = normalizeContactAudience(req.body.audience || req.body.target, "department");
       payload = {
         ...payload,
         name: student.fullName,
         email: student.email,
         department: student.department,
+        audience,
         student: student._id,
         studentName: student.fullName,
         studentId: student.studentId,
@@ -106,6 +140,9 @@ export async function createContact(req, res, next) {
     }
     if (payload.type === "complaint" && !payload.department) {
       return res.status(400).json({ message: "Student department is required for complaints." });
+    }
+    if (payload.type === "complaint" && !CONTACT_AUDIENCES.includes(payload.audience)) {
+      return res.status(400).json({ message: "Message audience must be admin or department." });
     }
 
     const record = await Contact.create(payload);
@@ -120,11 +157,11 @@ export async function updateContact(req, res, next) {
     const existing = await Contact.findById(req.params.id);
     if (!existing) return res.status(404).json({ message: "Message not found." });
 
-    if (req.user?.role === "lecturer") {
+    if (DEPARTMENT_MESSAGE_ROLES.includes(req.user?.role)) {
       const scope = await facultyScope(req);
       if (scope.error) return res.status(403).json({ message: scope.error });
-      if (existing.department !== scope.department || existing.type !== "complaint") {
-        return res.status(403).json({ message: "You can only manage complaints from students in your department." });
+      if (!contactIsVisibleToScope(existing, { role: req.user.role, department: scope.department })) {
+        return res.status(403).json({ message: "You can only manage messages sent to your department." });
       }
     } else if (req.user?.role === "student") {
       const student = await studentForUser(req);
@@ -134,6 +171,8 @@ export async function updateContact(req, res, next) {
       return res.status(403).json({ message: "Students cannot edit complaint status." });
     } else if (req.user?.role !== "admin") {
       return res.status(403).json({ message: "Admin or faculty access required." });
+    } else if (!contactIsVisibleToScope(existing, { role: "admin" })) {
+      return res.status(403).json({ message: "Admins can only manage messages sent to admin." });
     }
 
     const patch = {
@@ -157,14 +196,16 @@ export async function deleteContact(req, res, next) {
     const existing = await Contact.findById(req.params.id);
     if (!existing) return res.status(404).json({ message: "Message not found." });
 
-    if (req.user?.role === "lecturer") {
+    if (DEPARTMENT_MESSAGE_ROLES.includes(req.user?.role)) {
       const scope = await facultyScope(req);
       if (scope.error) return res.status(403).json({ message: scope.error });
-      if (existing.department !== scope.department || existing.type !== "complaint") {
-        return res.status(403).json({ message: "You can only delete complaints from students in your department." });
+      if (!contactIsVisibleToScope(existing, { role: req.user.role, department: scope.department })) {
+        return res.status(403).json({ message: "You can only delete messages sent to your department." });
       }
     } else if (req.user?.role !== "admin") {
       return res.status(403).json({ message: "Admin or faculty access required." });
+    } else if (!contactIsVisibleToScope(existing, { role: "admin" })) {
+      return res.status(403).json({ message: "Admins can only delete messages sent to admin." });
     }
 
     await Contact.findByIdAndDelete(req.params.id);

@@ -5,12 +5,20 @@ import { useNavigate } from "react-router-dom";
 import GlassCard from "../components/GlassCard.jsx";
 import SectionHeader from "../components/SectionHeader.jsx";
 import CmsSections from "../components/CmsSections.jsx";
-import { courses, departments, stats } from "../data.js";
+import { courses, departments, stats as statCards } from "../data.js";
 import useCmsPage, { usePageSeo } from "../hooks/useCmsPage.js";
 import { apiFetch } from "../lib/api.js";
 import heroBg from "../assets/ChatGPT Image May 22, 2026, 10_31_39 PM.png";
+import { useLanguage } from "../contexts/LanguageContext.jsx";
 
 const icons = [BookOpen, GraduationCap, Users, Users, CalendarDays];
+const statKeys = ["courses", "departments", "students", "lecturers", "events"];
+const emptyStats = statCards.map((item) => ({ ...item, value: "--" }));
+
+function formatStatValue(value) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue.toLocaleString() : "--";
+}
 
 const heroTextVariants = {
   hidden: { opacity: 0, y: 40 },
@@ -41,7 +49,9 @@ export default function Home() {
   const { scrollY } = useScroll();
   const [notices, setNotices] = useState([]);
   const [blogs, setBlogs] = useState([]);
+  const [liveStats, setLiveStats] = useState(emptyStats);
   const cmsPage = useCmsPage("home");
+  const { t, translate } = useLanguage();
   const cmsContent = cmsPage?.published || {};
   const visibleCmsPage = useMemo(() => {
     if (!cmsPage?.published?.sections) return cmsPage;
@@ -71,6 +81,22 @@ export default function Home() {
 
   useEffect(() => {
     let active = true;
+    const refreshStats = () => {
+      apiFetch("/api/public/stats")
+        .then((counts) => {
+          if (!active) return;
+          setLiveStats(
+            statCards.map((item, index) => ({
+              ...item,
+              value: formatStatValue(counts?.[statKeys[index]])
+            }))
+          );
+        })
+        .catch(() => {});
+    };
+
+    refreshStats();
+    const statsInterval = window.setInterval(refreshStats, 30000);
 
     apiFetch("/api/notices")
       .then((items) => {
@@ -92,6 +118,7 @@ export default function Home() {
 
     return () => {
       active = false;
+      window.clearInterval(statsInterval);
     };
   }, []);
 
@@ -135,7 +162,7 @@ export default function Home() {
               animate="visible"
               className="mb-4 text-sm font-bold uppercase tracking-[0.28em] text-blue-200"
             >
-              Advanced Technological Institute
+              Sri Lanka Institute of Advanced Technological Education.
             </motion.p>
             <motion.h1
               custom={1}
@@ -144,7 +171,7 @@ export default function Home() {
               animate="visible"
               className="text-shimmer text-5xl font-black leading-tight md:text-7xl"
             >
-              {cmsContent.heroTitle || "ATI Jaffna"}
+              Advanced Technological Institute Jaffna
             </motion.h1>
             <motion.p
               custom={2}
@@ -153,7 +180,7 @@ export default function Home() {
               animate="visible"
               className="mt-5 max-w-2xl text-xl leading-8 text-slate-100"
             >
-              {cmsContent.heroDescription || "Empowering Students Through Quality Education"}
+              {translate(cmsContent.heroDescription) || t("home.heroText")}
             </motion.p>
             <motion.div
               custom={3}
@@ -168,7 +195,7 @@ export default function Home() {
                 whileHover={{ scale: 1.04, y: -2 }}
                 whileTap={{ scale: 0.97 }}
               >
-                {cmsContent.primaryButtonText || "View Courses"}
+                {translate(cmsContent.primaryButtonText) || t("common.viewCourses")}
               </motion.button>
               <motion.button
                 onClick={() => openHeroLink(cmsContent.secondaryButtonLink || "/courses")}
@@ -176,7 +203,7 @@ export default function Home() {
                 whileHover={{ scale: 1.04, y: -2 }}
                 whileTap={{ scale: 0.97 }}
               >
-                {cmsContent.secondaryButtonText || "View Courses"}
+                {translate(cmsContent.secondaryButtonText) || t("common.viewCourses")}
               </motion.button>
             </motion.div>
           </motion.div>
@@ -185,7 +212,7 @@ export default function Home() {
 
       <section className="-mt-20 px-4 pb-20 sm:px-6 lg:px-8">
         <div className="relative mx-auto grid max-w-7xl gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          {stats.map((item, index) => {
+          {liveStats.map((item, index) => {
             const Icon = icons[index];
             return (
               <motion.div
@@ -219,7 +246,7 @@ export default function Home() {
       {notices.length > 0 && (
         <section className="page-section pt-0">
           <div className="mx-auto max-w-7xl">
-            <SectionHeader eyebrow="Notices" title="Latest Announcements" text="Important updates from ATI Jaffna administration." />
+            <SectionHeader eyebrow={t("home.notices")} title={t("home.latestAnnouncements")} text={t("home.noticesText")} />
             <motion.div
               className="grid gap-5 md:grid-cols-3"
               initial="hidden"
@@ -264,16 +291,16 @@ export default function Home() {
             viewport={{ once: true, margin: "-80px" }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
           >
-            <p className="text-sm font-bold uppercase tracking-[0.24em] text-blue-200">Campus Life</p>
-            <h2 className="mt-3 text-3xl font-black md:text-5xl">A focused place to learn, build, and grow.</h2>
-            <p className="mt-5 text-base leading-7 text-slate-100">From lecture rooms to practical labs, ATI Jaffna gives students the environment to turn ambition into skill.</p>
+            <p className="text-sm font-bold uppercase tracking-[0.24em] text-blue-200">{t("home.campusLife")}</p>
+            <h2 className="mt-3 text-3xl font-black md:text-5xl">{t("home.campusTitle")}</h2>
+            <p className="mt-5 text-base leading-7 text-slate-100">{t("home.campusText")}</p>
           </motion.div>
         </div>
       </section>
 
       <section className="page-section pt-0">
         <div className="mx-auto max-w-7xl">
-          <SectionHeader eyebrow="Pathways" title="Popular Courses" text="Industry-aware programmes designed for practical skills, confidence, and progression." />
+          <SectionHeader eyebrow={t("home.pathways")} title={t("home.popularCourses")} text={t("home.coursesText")} />
           <motion.div
             className="grid gap-5 md:grid-cols-3"
             initial="hidden"
@@ -291,7 +318,7 @@ export default function Home() {
                   <h3 className="text-xl font-black text-clay-text">{course.title}</h3>
                   <p className="mt-3 text-sm text-clay-muted">{course.duration} | {course.requirements}</p>
                   <button onClick={() => navigate("/courses")} className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-clay-accent transition group-hover:gap-3">
-                    View Courses <ArrowRight size={16} />
+                    {t("common.viewCourses")} <ArrowRight size={16} />
                   </button>
                 </GlassCard>
               </motion.div>
@@ -302,7 +329,7 @@ export default function Home() {
 
       <section className="page-section bg-clay-card/60">
         <div className="mx-auto max-w-7xl">
-          <SectionHeader eyebrow="Departments" title="Learning Communities" text="Focused academic departments support students with hands-on learning and close lecturer guidance." />
+          <SectionHeader eyebrow={t("home.departments")} title={t("home.communities")} text={t("home.departmentsText")} />
           <motion.div
             className="grid gap-5 md:grid-cols-3"
             initial="hidden"
@@ -330,7 +357,7 @@ export default function Home() {
 
       <section className="page-section">
         <div className="mx-auto max-w-7xl">
-          <SectionHeader eyebrow="News" title="Campus Events" text="Keep up with admin-published blogs and campus updates." />
+          <SectionHeader eyebrow={t("home.news")} title={t("home.events")} text={t("home.eventsText")} />
           <motion.div
             className="grid gap-5 md:grid-cols-3"
             initial="hidden"
@@ -360,16 +387,16 @@ export default function Home() {
                       onClick={() => navigate(`/news/${blog.slug || blog._id}`)}
                       className="mt-auto inline-flex items-center gap-2 pt-5 text-sm font-bold text-clay-accent transition group-hover:gap-3"
                     >
-                      Read Blog <ArrowRight size={16} />
+                      {t("common.readBlog")} <ArrowRight size={16} />
                     </button>
                   </div>
                 </motion.article>
               ))
             ) : (
               <div className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm md:col-span-3">
-                <p className="text-sm font-bold uppercase tracking-[0.16em] text-clay-accent">No Blogs</p>
-                <h3 className="mt-3 text-2xl font-black text-clay-text">No published blogs yet.</h3>
-                <p className="mt-2 text-sm text-clay-muted">Admin-published blogs will appear here.</p>
+                <p className="text-sm font-bold uppercase tracking-[0.16em] text-clay-accent">{t("common.noBlogs")}</p>
+                <h3 className="mt-3 text-2xl font-black text-clay-text">{t("common.noBlogsText")}</h3>
+                <p className="mt-2 text-sm text-clay-muted">{t("common.noBlogsHint")}</p>
               </div>
             )}
           </motion.div>

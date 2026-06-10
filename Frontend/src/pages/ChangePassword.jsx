@@ -8,7 +8,7 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 const portalPathForRole = (role) => {
   const normalized = String(role || "student").toLowerCase();
   if (normalized === "admin") return "/admin";
-  if (normalized === "lecturer" || normalized === "faculty") return "/faculty";
+  if (normalized === "lecturer" || normalized === "faculty" || normalized === "staff") return "/faculty";
   return "/student";
 };
 

@@ -15,9 +15,11 @@ import {
   X
 } from "lucide-react";
 import GlassCard from "../../components/GlassCard";
+import AppModal from "../../components/AppModal.jsx";
 import { apiFetch, downloadCsv } from "../../lib/api";
+import { useModal } from "../../contexts/ModalContext.jsx";
 
-const departments = [
+const fallbackDepartments = [
   "Higher National Diploma in Accountancy - (HNDA)",
   "Higher National Diploma in English",
   "Higher National Diploma in Engineering - Civil",
@@ -38,7 +40,7 @@ const initialForm = {
   fullName: "",
   email: "",
   phone: "",
-  department: departments[0],
+  department: fallbackDepartments[0],
   staffType: "Teaching Staff",
   coursesAssigned: 0,
   joinDate: "",
@@ -70,6 +72,11 @@ function departmentLabel(member) {
   return isDepartmentBased(member?.staffType) ? member?.department || "Not assigned" : "Not assigned";
 }
 
+function directoryGroupLabel(member) {
+  const department = departmentLabel(member);
+  return department === "Not assigned" ? "Administration / Non-department Staff" : department;
+}
+
 function Field({ label, children }) {
   return (
     <label className="space-y-1.5">
@@ -80,7 +87,9 @@ function Field({ label, children }) {
 }
 
 export default function FacultyManagement() {
+  const { confirm } = useModal();
   const [faculty, setFaculty] = useState([]);
+  const [departments, setDepartments] = useState(fallbackDepartments);
   const [search, setSearch] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("All Departments");
   const [typeFilter, setTypeFilter] = useState("All Types");
@@ -92,6 +101,16 @@ export default function FacultyManagement() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const loadDepartments = async () => {
+    try {
+      const data = await apiFetch("/api/departments");
+      const names = Array.isArray(data) ? data.map((department) => department.name).filter(Boolean) : [];
+      if (names.length) setDepartments(names);
+    } catch {
+      setDepartments(fallbackDepartments);
+    }
+  };
 
   const loadFaculty = async () => {
     setLoading(true);
@@ -106,6 +125,7 @@ export default function FacultyManagement() {
   };
 
   useEffect(() => {
+    loadDepartments();
     loadFaculty();
   }, []);
 
@@ -148,11 +168,26 @@ export default function FacultyManagement() {
           count: faculty.filter((member) => isDepartmentBased(member.staffType) && member.department === department).length
         }))
         .filter((item) => item.count > 0),
-    [faculty]
+    [departments, faculty]
   );
 
+  const groupedFaculty = useMemo(() => {
+    const groups = filtered.reduce((acc, member) => {
+      const group = directoryGroupLabel(member);
+      if (!acc[group]) acc[group] = [];
+      acc[group].push(member);
+      return acc;
+    }, {});
+
+    return Object.entries(groups).sort(([a], [b]) => {
+      if (a === "Administration / Non-department Staff") return 1;
+      if (b === "Administration / Non-department Staff") return -1;
+      return a.localeCompare(b);
+    });
+  }, [filtered]);
+
   const resetForm = () => {
-    setForm(initialForm);
+    setForm({ ...initialForm, department: departments[0] || "" });
     setEditingId("");
     setShowForm(false);
   };
@@ -162,7 +197,7 @@ export default function FacultyManagement() {
       fullName: member.fullName || "",
       email: member.email || "",
       phone: member.phone || "",
-      department: member.department || departments[0],
+      department: member.department || departments[0] || "",
       staffType: member.staffType || "Teaching Staff",
       coursesAssigned: member.coursesAssigned ?? 0,
       joinDate: member.joinDate ? String(member.joinDate).slice(0, 10) : "",
@@ -207,7 +242,7 @@ export default function FacultyManagement() {
   };
 
   const deleteFaculty = async (member) => {
-    if (!window.confirm(`Delete ${member.fullName}?`)) return;
+    if (!await confirm({ title: "Delete faculty member?", message: `Delete ${member.fullName} and the linked login account?`, confirmLabel: "Delete faculty", tone: "danger" })) return;
     setError("");
     try {
       await apiFetch(`/api/faculty/${member._id}`, { method: "DELETE" });
@@ -254,14 +289,14 @@ export default function FacultyManagement() {
           <button
             type="button"
             onClick={() => {
-              setForm(initialForm);
+              setForm({ ...initialForm, department: departments[0] || "" });
               setEditingId("");
               setShowForm(true);
             }}
             className="inline-flex h-10 items-center gap-2 rounded-lg bg-sky-500 px-3 text-sm font-black text-slate-950 transition hover:bg-sky-400"
           >
             <Plus size={16} />
-            Add Faculty
+            Add Staff
           </button>
         </div>
       </div>
@@ -289,7 +324,8 @@ export default function FacultyManagement() {
       </div>
 
       {showForm && (
-        <GlassCard className="rounded-lg p-5">
+        <AppModal open={showForm} onClose={resetForm} size="lg" hideClose>
+        <GlassCard className="m-0 rounded-lg p-5">
           <form onSubmit={saveFaculty} className="space-y-5">
             <div className="flex flex-col gap-3 border-b border-[color:var(--md-border)] pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -352,6 +388,7 @@ export default function FacultyManagement() {
             </div>
           </form>
         </GlassCard>
+        </AppModal>
       )}
 
       <GlassCard className="rounded-lg p-4">
@@ -394,55 +431,65 @@ export default function FacultyManagement() {
               <p className="mt-1 text-sm text-[color:var(--md-text-secondary)]">Adjust the filters or add a faculty member.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-[860px] w-full text-left">
-                <thead className="bg-[color:var(--md-hover)] text-xs font-bold uppercase tracking-[0.12em] text-[color:var(--md-text-secondary)]">
-                  <tr>
-                    <th className="px-5 py-3">Faculty</th>
-                    <th className="px-4 py-3">Department</th>
-                    <th className="px-4 py-3">Type</th>
-                    <th className="px-4 py-3">Courses</th>
-                    <th className="px-4 py-3">Joined</th>
-                    <th className="px-5 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[color:var(--md-border)]">
-                  {filtered.map((member) => (
-                    <tr key={member._id} className="transition hover:bg-[color:var(--md-hover)]">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sky-400/15 text-sm font-black text-[color:var(--md-primary)]">
-                            {initials(member.fullName)}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-black text-[color:var(--md-text-primary)]">{member.fullName}</p>
-                            <p className="mt-1 truncate text-xs text-[color:var(--md-text-secondary)]">{member.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="max-w-[260px] px-4 py-4 text-sm font-semibold text-[color:var(--md-text-secondary)]">{departmentLabel(member)}</td>
-                      <td className="px-4 py-4">
-                        <span className="inline-flex rounded-lg bg-[color:var(--md-hover)] px-2.5 py-1 text-xs font-bold text-[color:var(--md-text-secondary)]">{member.staffType}</span>
-                      </td>
-                      <td className="px-4 py-4 text-sm font-bold text-[color:var(--md-text-secondary)]">{member.coursesAssigned || 0}</td>
-                      <td className="px-4 py-4 text-sm text-[color:var(--md-text-secondary)]">{formatDate(member.joinDate)}</td>
-                      <td className="px-5 py-4">
-                        <div className="flex justify-end gap-1">
-                          <button type="button" onClick={() => setSelectedFaculty(member)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[color:var(--md-primary)] transition hover:bg-sky-500/10" aria-label={`View ${member.fullName}`}>
-                            <Eye size={16} />
-                          </button>
-                          <button type="button" onClick={() => startEdit(member)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[color:var(--md-text-secondary)] transition hover:bg-[color:var(--md-hover)] hover:text-[color:var(--md-text-primary)]" aria-label={`Edit ${member.fullName}`}>
-                            <Edit3 size={16} />
-                          </button>
-                          <button type="button" onClick={() => deleteFaculty(member)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[color:var(--md-danger)] transition hover:bg-red-500/10" aria-label={`Delete ${member.fullName}`}>
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="divide-y divide-[color:var(--md-border)]">
+              {groupedFaculty.map(([group, members]) => (
+                <section key={group}>
+                  <div className="flex flex-col gap-1 bg-[color:var(--md-hover)] px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <h3 className="text-sm font-black text-[color:var(--md-text-primary)]">{group}</h3>
+                    <span className="text-xs font-bold uppercase tracking-[0.12em] text-[color:var(--md-text-secondary)]">{members.length} staff</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-[860px] w-full text-left">
+                      <thead className="text-xs font-bold uppercase tracking-[0.12em] text-[color:var(--md-text-secondary)]">
+                        <tr>
+                          <th className="px-5 py-3">Faculty</th>
+                          <th className="px-4 py-3">Department</th>
+                          <th className="px-4 py-3">Type</th>
+                          <th className="px-4 py-3">Courses</th>
+                          <th className="px-4 py-3">Joined</th>
+                          <th className="px-5 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[color:var(--md-border)]">
+                        {members.map((member) => (
+                          <tr key={member._id} className="transition hover:bg-[color:var(--md-hover)]">
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sky-400/15 text-sm font-black text-[color:var(--md-primary)]">
+                                  {initials(member.fullName)}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-black text-[color:var(--md-text-primary)]">{member.fullName}</p>
+                                  <p className="mt-1 truncate text-xs text-[color:var(--md-text-secondary)]">{member.email}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="max-w-[260px] px-4 py-4 text-sm font-semibold text-[color:var(--md-text-secondary)]">{departmentLabel(member)}</td>
+                            <td className="px-4 py-4">
+                              <span className="inline-flex rounded-lg bg-[color:var(--md-hover)] px-2.5 py-1 text-xs font-bold text-[color:var(--md-text-secondary)]">{member.staffType}</span>
+                            </td>
+                            <td className="px-4 py-4 text-sm font-bold text-[color:var(--md-text-secondary)]">{member.coursesAssigned || 0}</td>
+                            <td className="px-4 py-4 text-sm text-[color:var(--md-text-secondary)]">{formatDate(member.joinDate)}</td>
+                            <td className="px-5 py-4">
+                              <div className="flex justify-end gap-1">
+                                <button type="button" onClick={() => setSelectedFaculty(member)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[color:var(--md-primary)] transition hover:bg-sky-500/10" aria-label={`View ${member.fullName}`}>
+                                  <Eye size={16} />
+                                </button>
+                                <button type="button" onClick={() => startEdit(member)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[color:var(--md-text-secondary)] transition hover:bg-[color:var(--md-hover)] hover:text-[color:var(--md-text-primary)]" aria-label={`Edit ${member.fullName}`}>
+                                  <Edit3 size={16} />
+                                </button>
+                                <button type="button" onClick={() => deleteFaculty(member)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[color:var(--md-danger)] transition hover:bg-red-500/10" aria-label={`Delete ${member.fullName}`}>
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ))}
             </div>
           )}
         </GlassCard>

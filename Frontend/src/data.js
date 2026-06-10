@@ -1,6 +1,6 @@
 export const stats = [
   { label: "Courses", value: "12+" },
-  { label: "Departments", value: "5" },
+  { label: "Departments", value: "7" },
   { label: "Students", value: "1,200+" },
   { label: "Lecturers", value: "80+" },
   { label: "Events", value: "35" }
@@ -8,29 +8,39 @@ export const stats = [
 
 export const departments = [
   {
-    title: "IT Department",
-    image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=900&q=80",
-    description: "Software, networking, databases, and practical digital problem solving."
+    title: "Higher National Diploma in Accountancy - (HNDA)",
+    image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=900&q=80",
+    description: "Financial reporting, taxation, auditing, and professional accounting practice."
   },
   {
-    title: "Management",
-    image: "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=900&q=80",
-    description: "Leadership, operations, accounting, and modern organizational practice."
-  },
-  {
-    title: "English",
+    title: "Higher National Diploma in English",
     image: "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=900&q=80",
     description: "Communication, academic writing, literature, and professional fluency."
   },
   {
-    title: "Engineering Technology",
+    title: "Higher National Diploma in Engineering - Civil",
     image: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=900&q=80",
-    description: "Applied engineering foundations with workshop and project-based learning."
+    description: "Construction technology, surveying, materials, and infrastructure foundations."
   },
   {
-    title: "Business Studies",
-    image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=900&q=80",
-    description: "Entrepreneurship, commerce, finance, and practical business planning."
+    title: "Higher National Diploma in Engineering - Electrical",
+    image: "https://images.unsplash.com/photo-1518779578993-ec3579fee39f?auto=format&fit=crop&w=900&q=80",
+    description: "Circuits, power systems, machines, and applied electrical technology."
+  },
+  {
+    title: "Higher National Diploma in Management - (HNDM)",
+    image: "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=900&q=80",
+    description: "Leadership, operations, organizational practice, and administration."
+  },
+  {
+    title: "Higher National Diploma in Information Technology - (HNDIT)",
+    image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=900&q=80",
+    description: "Software, networking, databases, and practical digital problem solving."
+  },
+  {
+    title: "Higher National Diploma in Quantity Surveying",
+    image: "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=900&q=80",
+    description: "Cost estimation, contracts, measurement, and construction economics."
   }
 ];
 
@@ -213,25 +223,6 @@ export const feeData = {
   ]
 };
 
-export const placementData = {
-  status: "registered",
-  companies: [
-    { name: "Virtusa Lanka", location: "Colombo", roles: ["Software Engineer", "QA Engineer"], stipend: "LKR 80,000 - 120,000" },
-    { name: "WSO2 Lanka", location: "Colombo", roles: ["Software Engineer", "DevOps Engineer"], stipend: "LKR 90,000 - 150,000" },
-    { name: "IFS Lanka", location: "Colombo", roles: ["Associate Developer", "Database Administrator"], stipend: "LKR 75,000 - 110,000" },
-    { name: "Axiata Digital Labs", location: "Colombo", roles: ["Frontend Developer", "Backend Developer"], stipend: "LKR 70,000 - 100,000" },
-    { name: "Jaffna IT Park Startups", location: "Jaffna", roles: ["Junior Developer", "IT Support"], stipend: "LKR 50,000 - 70,000" }
-  ],
-  applications: [
-    { id: 1, company: "Virtusa Lanka", role: "Software Engineer", status: "shortlisted", appliedDate: "2026-03-20" },
-    { id: 2, company: "IFS Lanka", role: "Associate Developer", status: "applied", appliedDate: "2026-04-02" },
-    { id: 3, company: "WSO2 Lanka", role: "Software Engineer", status: "interview", appliedDate: "2026-03-25", interviewDate: "2026-05-10" }
-  ],
-  interviews: [
-    { id: 1, company: "WSO2 Lanka", role: "Software Engineer", date: "2026-05-10", time: "10:00 AM", mode: "Online", status: "scheduled" }
-  ]
-};
-
 export const courseProgress = [
   { subject: "Advanced Web Development", progress: 75, completedTopics: 9, totalTopics: 12 },
   { subject: "Database Management Systems", progress: 60, completedTopics: 6, totalTopics: 10 },
@@ -240,33 +231,6 @@ export const courseProgress = [
   { subject: "Object-Oriented Programming", progress: 80, completedTopics: 8, totalTopics: 10 },
   { subject: "Project Management", progress: 55, completedTopics: 5, totalTopics: 9 }
 ];
-
-export const libraryData = {
-  borrowed: [
-    { id: 1, title: "Clean Code", author: "Robert C. Martin", borrowDate: "2026-03-01", dueDate: "2026-04-15", status: "overdue" },
-    { id: 2, title: "Database System Concepts", author: "Silberschatz", borrowDate: "2026-03-20", dueDate: "2026-05-01", status: "active" },
-    { id: 3, title: "Introduction to Algorithms", author: "Cormen", borrowDate: "2026-04-05", dueDate: "2026-05-20", status: "active" }
-  ],
-  history: [
-    { title: "JavaScript: The Good Parts", author: "Douglas Crockford", borrowedDate: "2025-11-10", returnedDate: "2025-12-05" },
-    { title: "Head First Design Patterns", author: "Freeman", borrowedDate: "2026-01-15", returnedDate: "2026-02-10" },
-    { title: "Operating System Concepts", author: "Silberschatz", borrowedDate: "2025-09-20", returnedDate: "2025-10-18" },
-    { title: "Computer Networking", author: "Kurose & Ross", borrowedDate: "2026-02-01", returnedDate: "2026-02-28" }
-  ],
-  fines: 150,
-  totalBooks: 12500
-};
-
-export const hostelData = {
-  roomNumber: "H-204",
-  block: "Kovil Block",
-  fees: 45000,
-  amenities: ["Wi-Fi", "Study Table", "Ceiling Fan", "Cupboard", "24/7 Water Supply", "Common Kitchen"],
-  complaints: [
-    { id: 1, title: "Fan Not Working", description: "Ceiling fan in room H-204 is not functioning.", status: "resolved", date: "2026-03-10", resolvedDate: "2026-03-12" },
-    { id: 2, title: "Water Leakage", description: "Pipe under sink is leaking.", status: "pending", date: "2026-04-08", resolvedDate: "" }
-  ]
-};
 
 export const transportData = {
   route: "Jaffna Town - ATI Campus",

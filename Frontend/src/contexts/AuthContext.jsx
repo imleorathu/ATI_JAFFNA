@@ -41,7 +41,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem("atiToken", token);
   };
 
-  const login = async (email, password) => {
+  const login = async (identifier, password) => {
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/api/auth/login`, {
@@ -49,7 +49,7 @@ export function AuthProvider({ children }) {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ identifier, password })
       });
 
       const data = await readResponse(response, "Login failed");
@@ -135,6 +135,36 @@ export function AuthProvider({ children }) {
     const handleAuthCleared = () => setUser(null);
     window.addEventListener("ati-auth-cleared", handleAuthCleared);
     return () => window.removeEventListener("ati-auth-cleared", handleAuthCleared);
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem("atiToken");
+    if (!token) return;
+
+    let cancelled = false;
+    const refreshProfile = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/api/auth/profile`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await readResponse(response, "Profile refresh failed");
+        if (!cancelled && data.user) {
+          setUser(data.user);
+          localStorage.setItem("atiUser", JSON.stringify(data.user));
+        }
+      } catch {
+        if (!cancelled) {
+          localStorage.removeItem("atiUser");
+          localStorage.removeItem("atiToken");
+          setUser(null);
+        }
+      }
+    };
+
+    refreshProfile();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const isAuthenticated = Boolean(user && localStorage.getItem("atiToken"));

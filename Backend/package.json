@@ -5,7 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "seed:departments": "node scripts/seedDepartments.js",
+    "seed:test-students": "node scripts/seedTestStudents.js",
+    "migrate:role-profiles": "node scripts/migrateRoleProfiles.js",
+    "sync:staff-profiles": "node scripts/syncStaffProfiles.js",
+    "seed:portal-data": "node scripts/seedPortalData.js",
+    "seed:part-time-fees": "node scripts/seedPartTimeFees.js",
+    "test:department-access": "node --test tests/departmentAccess.test.js",
+    "test:fee-access": "node --test tests/feeAccess.test.js",
+    "db:migrate-case": "node scripts/migrateDatabaseCase.js",
+    "db:indexes": "node models/indexes.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -19,7 +29,6 @@
     "multer": "^2.0.2",
     "pdf-parse": "^2.4.5",
     "uuid": "^14.0.0",
-    "xlsx": "^0.18.5",
     "yauzl": "^3.3.1"
   },
   "devDependencies": {

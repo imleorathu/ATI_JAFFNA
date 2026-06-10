@@ -17,4 +17,12 @@ const facultySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+facultySchema.index(
+  { department: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { staffType: "Head of the department" }
+  }
+);
+
 export default mongoose.model("Faculty", facultySchema);

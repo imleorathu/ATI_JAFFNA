@@ -5,6 +5,7 @@ import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis
 import GlassCard from "../../components/GlassCard";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiFetch, downloadCsv } from "../../lib/api";
+import { useModal } from "../../contexts/ModalContext.jsx";
 
 const gradePoints = { "A+": 4.0, A: 4.0, "A-": 3.7, "B+": 3.3, B: 3.0, "B-": 2.7, "C+": 2.3, C: 2.0, "C-": 1.7, "D+": 1.3, D: 1.0, F: 0 };
 const gradeOptions = Object.keys(gradePoints);
@@ -46,10 +47,51 @@ function computeGpa(grades) {
   return totals.credits ? totals.points / totals.credits : 0;
 }
 
+function ReportTable({ title, rows }) {
+  return (
+    <GlassCard className="p-5">
+      <div className="mb-4">
+        <h2 className="classroom-section-title">{title}</h2>
+        <p className="text-sm" style={{ color: "var(--md-text-secondary)" }}>{rows.length} report rows</p>
+      </div>
+      <div className="max-h-80 overflow-auto">
+        <table className="w-full text-left text-sm">
+          <thead className="sticky top-0 bg-[color:var(--md-card)] text-xs uppercase tracking-[0.12em] text-[color:var(--md-text-secondary)]">
+            <tr>
+              <th className="pb-3 pr-3">Name</th>
+              <th className="pb-3 pr-3">Records</th>
+              <th className="pb-3 pr-3">Students</th>
+              <th className="pb-3 pr-3">Avg</th>
+              <th className="pb-3 pr-3">Pass</th>
+              <th className="pb-3">GPA</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[color:var(--md-border)]">
+            {rows.length === 0 ? (
+              <tr><td colSpan={6} className="py-8 text-center text-[color:var(--md-text-secondary)]">No report data.</td></tr>
+            ) : rows.map((row) => (
+              <tr key={row.label}>
+                <td className="py-3 pr-3 font-semibold text-[color:var(--md-text-primary)]">{row.label}</td>
+                <td className="py-3 pr-3 text-[color:var(--md-text-secondary)]">{row.records}</td>
+                <td className="py-3 pr-3 text-[color:var(--md-text-secondary)]">{row.students}</td>
+                <td className="py-3 pr-3 font-bold" style={{ color: gradeColor(row.averageScore) }}>{row.averageScore.toFixed(1)}%</td>
+                <td className="py-3 pr-3 text-[color:var(--md-text-secondary)]">{row.passRate.toFixed(1)}%</td>
+                <td className="py-3 font-bold text-[color:var(--md-primary)]">{row.gpa.toFixed(2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </GlassCard>
+  );
+}
+
 export default function GradesPage() {
+  const { confirm } = useModal();
   const { user } = useAuth();
   const role = String(user?.role || "").toLowerCase();
   const canManage = ["lecturer", "admin"].includes(role);
+  const isAdmin = role === "admin";
   const isFaculty = role === "lecturer";
 
   const [grades, setGrades] = useState([]);
@@ -58,6 +100,10 @@ export default function GradesPage() {
   const [editingId, setEditingId] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [subjectFilter, setSubjectFilter] = useState("all");
+  const [semesterFilter, setSemesterFilter] = useState("all");
+  const [academicStageFilter, setAcademicStageFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -82,20 +128,73 @@ export default function GradesPage() {
 
   useEffect(() => { loadData(); }, []);
 
+  const departments = useMemo(() => [...new Set(grades.map((item) => item.department).filter(Boolean))].sort(), [grades]);
+  const subjects = useMemo(() => [...new Set(grades.map((item) => item.subject).filter(Boolean))].sort(), [grades]);
+  const semesters = useMemo(
+    () => [...new Set(grades.map((item) => item.semester).filter((value) => value !== undefined && value !== null))].sort((a, b) => Number(a) - Number(b)),
+    [grades]
+  );
+  const academicStages = useMemo(() => [...new Set(grades.map((item) => item.academicStage).filter(Boolean))].sort(), [grades]);
+
   const filteredGrades = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return grades;
     return grades.filter((item) =>
-      [item.studentName, item.studentId, item.department, item.academicStage, item.subject, item.grade, item.remarks]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(query))
+      (departmentFilter === "all" || item.department === departmentFilter) &&
+      (subjectFilter === "all" || item.subject === subjectFilter) &&
+      (semesterFilter === "all" || String(item.semester) === String(semesterFilter)) &&
+      (academicStageFilter === "all" || item.academicStage === academicStageFilter) &&
+      (!query ||
+        [item.studentName, item.studentId, item.department, item.academicStage, item.subject, item.grade, item.remarks]
+          .filter(Boolean)
+          .some((v) => String(v).toLowerCase().includes(query)))
     );
-  }, [grades, search]);
+  }, [academicStageFilter, departmentFilter, grades, search, semesterFilter, subjectFilter]);
 
   const gpa = useMemo(() => computeGpa(filteredGrades), [filteredGrades]);
   const totalCredits = useMemo(() => filteredGrades.reduce((s, i) => s + Number(i.credits || 0), 0), [filteredGrades]);
   const topGrade = useMemo(() => filteredGrades.reduce((best, item) => (!best || Number(item.score) > Number(best.score) ? item : best), null), [filteredGrades]);
+  const summarizeBy = (items, keyFn, labelFallback = "Not assigned") =>
+    Object.values(items.reduce((acc, item) => {
+      const label = keyFn(item) || labelFallback;
+      if (!acc[label]) acc[label] = { label, records: 0, students: new Set(), credits: 0, scoreTotal: 0, passes: 0, fails: 0, gpaItems: [] };
+      acc[label].records += 1;
+      acc[label].students.add(item.studentId || item.studentName || item.student);
+      acc[label].credits += Number(item.credits || 0);
+      acc[label].scoreTotal += Number(item.score || 0);
+      acc[label].passes += Number(item.score || 0) >= 40 ? 1 : 0;
+      acc[label].fails += Number(item.score || 0) < 40 ? 1 : 0;
+      acc[label].gpaItems.push(item);
+      return acc;
+    }, {})).map((item) => ({
+      ...item,
+      students: item.students.size,
+      averageScore: item.records ? item.scoreTotal / item.records : 0,
+      passRate: item.records ? (item.passes / item.records) * 100 : 0,
+      gpa: computeGpa(item.gpaItems)
+    })).sort((a, b) => String(a.label).localeCompare(String(b.label)));
+
+  const subjectReports = useMemo(() => summarizeBy(filteredGrades, (item) => item.subject), [filteredGrades]);
+  const semesterReports = useMemo(() => summarizeBy(filteredGrades, (item) => `Semester ${item.semester}`), [filteredGrades]);
+  const departmentReports = useMemo(() => summarizeBy(filteredGrades, (item) => item.department), [filteredGrades]);
+  const adminStats = useMemo(() => ({
+    records: filteredGrades.length,
+    departments: new Set(filteredGrades.map((item) => item.department).filter(Boolean)).size,
+    subjects: new Set(filteredGrades.map((item) => item.subject).filter(Boolean)).size,
+    averageScore: filteredGrades.length ? filteredGrades.reduce((sum, item) => sum + Number(item.score || 0), 0) / filteredGrades.length : 0
+  }), [filteredGrades]);
   const chartData = useMemo(() => filteredGrades.map((item) => ({ subject: item.subject.length > 14 ? `${item.subject.slice(0, 12)}…` : item.subject, score: item.score, fullName: item.subject })), [filteredGrades]);
+
+  const chartRows = useMemo(() => {
+    const source = isAdmin ? subjectReports : chartData.map((item) => ({ label: item.fullName, averageScore: item.score }));
+    return source.map((item) => {
+      const label = item.label || "Subject";
+      return {
+        subject: label.length > 14 ? `${label.slice(0, 12)}...` : label,
+        score: Number(Number(item.averageScore || 0).toFixed(1)),
+        fullName: label
+      };
+    });
+  }, [chartData, isAdmin, subjectReports]);
 
   const resetForm = () => { setForm(emptyForm); setEditingId(""); setShowForm(false); };
 
@@ -127,7 +226,7 @@ export default function GradesPage() {
   };
 
   const deleteGrade = async (grade) => {
-    if (!window.confirm(`Delete ${grade.subject} grade for ${grade.studentName}?`)) return;
+    if (!await confirm({ title: "Delete grade?", message: `Delete the ${grade.subject} grade for ${grade.studentName}?`, confirmLabel: "Delete grade", tone: "danger" })) return;
     setError(""); setStatus("");
     try {
       await apiFetch(`/api/grades/${grade._id}`, { method: "DELETE" });
@@ -140,6 +239,13 @@ export default function GradesPage() {
 
   const exportGrades = () =>
     downloadCsv("ati-grades.csv", filteredGrades.map((item) => ({ studentName: item.studentName, studentId: item.studentId, department: item.department, group: item.academicStage, subject: item.subject, semester: item.semester, credits: item.credits, score: item.score, grade: item.grade, remarks: item.remarks })));
+
+  const exportReport = () =>
+    downloadCsv("ati-grade-full-report.csv", [
+      ...departmentReports.map((item) => ({ reportType: "Department", name: item.label, records: item.records, students: item.students, credits: item.credits, averageScore: item.averageScore.toFixed(2), passRate: item.passRate.toFixed(2), gpa: item.gpa.toFixed(2) })),
+      ...subjectReports.map((item) => ({ reportType: "Subject", name: item.label, records: item.records, students: item.students, credits: item.credits, averageScore: item.averageScore.toFixed(2), passRate: item.passRate.toFixed(2), gpa: item.gpa.toFixed(2) })),
+      ...semesterReports.map((item) => ({ reportType: "Semester", name: item.label, records: item.records, students: item.students, credits: item.credits, averageScore: item.averageScore.toFixed(2), passRate: item.passRate.toFixed(2), gpa: item.gpa.toFixed(2) }))
+    ]);
 
   /* ---- chart theme ---- */
   const isDark = document.documentElement.dataset.portalTheme === "dark";
@@ -154,10 +260,10 @@ export default function GradesPage() {
       {/* Header */}
       <div className="portal-page-header">
         <div>
-          <p className="portal-page-label">{canManage ? "Department Staff" : "Student"}</p>
+          <p className="portal-page-label">{isAdmin ? "Admin" : canManage ? "Department Staff" : "Student"}</p>
           <h1 className="portal-page-title">{canManage ? "Grade Management" : "Academic Performance"}</h1>
           <p className="portal-page-subtitle">
-            {canManage ? "Manage grades only for students in your department." : "View your official grades and GPA breakdown."}
+            {isAdmin ? "Review all department grades with subject-wise, semester, and academic-stage reports." : canManage ? "Manage grades only for students in your department." : "View your official grades and GPA breakdown."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -167,6 +273,11 @@ export default function GradesPage() {
           <button type="button" onClick={exportGrades} disabled={!filteredGrades.length} className="portal-btn">
             <Download size={15} /> Export
           </button>
+          {isAdmin && (
+            <button type="button" onClick={exportReport} disabled={!filteredGrades.length} className="portal-btn">
+              <Download size={15} /> Full Report
+            </button>
+          )}
           {canManage && (
             <button type="button" onClick={startCreate} className="portal-btn-primary">
               <Plus size={15} /> Add Grade
@@ -178,6 +289,69 @@ export default function GradesPage() {
       {/* Alerts */}
       {error  && <div className="portal-alert-danger">{error}</div>}
       {status && <div className="portal-alert-success">{status}</div>}
+
+      {isAdmin && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              { label: "Grade Records", value: adminStats.records, Icon: Award, color: "var(--md-primary)" },
+              { label: "Departments", value: adminStats.departments, Icon: BarChart3, color: "var(--color-ocean)" },
+              { label: "Subjects", value: adminStats.subjects, Icon: Award, color: "var(--color-mint)" },
+              { label: "Average Score", value: `${adminStats.averageScore.toFixed(1)}%`, Icon: BarChart3, color: "#f59e0b" }
+            ].map(({ label, value, Icon, color }) => (
+              <div key={label} className="portal-stat-card">
+                <div>
+                  <p className="portal-stat-label">{label}</p>
+                  <p className="portal-stat-value" style={{ color }}>{value}</p>
+                </div>
+                <div className="portal-stat-icon" style={{ background: `${color}18`, color }}>
+                  <Icon size={22} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <GlassCard className="p-5">
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="classroom-section-title">Admin Grade Filters</h2>
+                <p className="text-sm" style={{ color: "var(--md-text-secondary)" }}>Filter by department, subject, semester, and academic stage.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDepartmentFilter("all");
+                  setSubjectFilter("all");
+                  setSemesterFilter("all");
+                  setAcademicStageFilter("all");
+                  setSearch("");
+                }}
+                className="portal-btn"
+              >
+                Clear Filters
+              </button>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <select value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className="portal-input">
+                <option value="all">All departments</option>
+                {departments.map((department) => <option key={department} value={department}>{department}</option>)}
+              </select>
+              <select value={subjectFilter} onChange={(event) => setSubjectFilter(event.target.value)} className="portal-input">
+                <option value="all">All subjects</option>
+                {subjects.map((subject) => <option key={subject} value={subject}>{subject}</option>)}
+              </select>
+              <select value={semesterFilter} onChange={(event) => setSemesterFilter(event.target.value)} className="portal-input">
+                <option value="all">All semesters</option>
+                {semesters.map((semester) => <option key={semester} value={semester}>Semester {semester}</option>)}
+              </select>
+              <select value={academicStageFilter} onChange={(event) => setAcademicStageFilter(event.target.value)} className="portal-input">
+                <option value="all">All academic stages</option>
+                {academicStages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
+              </select>
+            </div>
+          </GlassCard>
+        </>
+      )}
 
       {/* Student stat cards */}
       {!canManage && (
@@ -198,6 +372,14 @@ export default function GradesPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="grid gap-6 xl:grid-cols-3">
+          <ReportTable title="Department Reports" rows={departmentReports} />
+          <ReportTable title="Subject-Wise Reports" rows={subjectReports} />
+          <ReportTable title="Semester Reports" rows={semesterReports} />
         </div>
       )}
 
@@ -237,17 +419,17 @@ export default function GradesPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Chart */}
         <GlassCard className="p-5">
-          <h2 className="classroom-section-title">Subject Performance</h2>
-          <p className="mt-1 text-sm" style={{ color: "var(--md-text-secondary)" }}>Scores by subject.</p>
+          <h2 className="classroom-section-title">{isAdmin ? "Subject Average Performance" : "Subject Performance"}</h2>
+          <p className="mt-1 text-sm" style={{ color: "var(--md-text-secondary)" }}>{isAdmin ? "Average scores by subject across the selected report scope." : "Scores by subject."}</p>
           <div className="mt-4 h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
+              <BarChart data={chartRows}>
                 <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
                 <XAxis dataKey="subject" tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Bar dataKey="score" radius={[6, 6, 0, 0]}>
-                  {chartData.map((entry) => <Cell key={entry.fullName} fill={gradeColor(entry.score)} />)}
+                  {chartRows.map((entry) => <Cell key={entry.fullName} fill={gradeColor(entry.score)} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

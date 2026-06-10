@@ -4,6 +4,7 @@ import { Calendar, ChevronLeft, ChevronRight, Clock, Download, Edit3, MapPin, Pl
 import GlassCard from "../../components/GlassCard.jsx";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { apiFetch, downloadCsv } from "../../lib/api.js";
+import { useModal } from "../../contexts/ModalContext.jsx";
 
 const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const dayShort = ["Mon", "Tue", "Wed", "Thu", "Fri"];
@@ -16,8 +17,7 @@ const departments = [
   "Higher National Diploma in Information Technology - (HNDIT)",
   "Higher National Diploma in Quantity Surveying"
 ];
-const hnditDepartment = "Higher National Diploma in Information Technology - (HNDIT)";
-const hnditAcademicStages = ["First year Full Time", "Second year Full Time", "First year Part Time", "Second year Part Time"];
+const academicStages = ["First year Full Time", "Second year Full Time", "First year Part Time", "Second year Part Time"];
 const specialPeriods = ["Free Period", "Interval"];
 const defaultTimeSlots = ["08:00 - 09:00","09:00 - 10:00","10:00 - 11:00","11:00 - 12:00","12:00 - 01:00","01:00 - 02:00","02:00 - 03:00"];
 const timePattern = /^(0?[1-9]|1[0-2]):[0-5][0-9]\s*-\s*(0?[1-9]|1[0-2]):[0-5][0-9]$/;
@@ -65,6 +65,7 @@ function colorForSubject(subject) {
 }
 
 export default function TimetablePage() {
+  const { confirm } = useModal();
   const { user } = useAuth();
   const role = String(user?.role || "").toLowerCase();
   const canManage = ["admin","lecturer"].includes(role);
@@ -79,6 +80,7 @@ export default function TimetablePage() {
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [facultyScope, setFacultyScope] = useState(null);
+  const [lecturers, setLecturers] = useState([]);
   const [overviewGroupFilter, setOverviewGroupFilter] = useState("all");
 
   const overviewEntries = useMemo(() => entries.filter(e => overviewGroupFilter==="all"||(e.academicStage||"")===overviewGroupFilter), [entries,overviewGroupFilter]);
@@ -87,16 +89,20 @@ export default function TimetablePage() {
   const overviewTimeSlots = useMemo(() => buildTimeSlots(overviewEntries), [overviewEntries]);
   const currentDayData = timetable[selectedDay];
   const stats = getStats(currentDayData);
+  const selectedDepartment = isFaculty ? facultyScope?.faculty?.department : form.department;
+  const availableLecturers = useMemo(() => lecturers.filter(lecturer => lecturer.department === selectedDepartment), [lecturers,selectedDepartment]);
 
   const loadData = async () => {
     setLoading(true); setError(""); setStatus("");
     try {
-      const [data, scopeData] = await Promise.all([
+      const [data, scopeData, lecturerData] = await Promise.all([
         apiFetch("/api/timetable"),
-        isFaculty ? apiFetch("/api/students/my-department").catch(()=>null) : Promise.resolve(null)
+        isFaculty ? apiFetch("/api/students/my-department").catch(()=>null) : Promise.resolve(null),
+        canManage ? apiFetch("/api/faculty/timetable-options") : Promise.resolve([])
       ]);
       setEntries(Array.isArray(data) ? sortEntries(data) : []);
       if(scopeData) setFacultyScope(scopeData);
+      setLecturers(Array.isArray(lecturerData) ? lecturerData : []);
     } catch(err) { setError(err?.message||"Unable to load timetable."); }
     finally { setLoading(false); }
   };
@@ -112,7 +118,7 @@ export default function TimetablePage() {
     if(!timePattern.test(form.time.trim())) { setError("Use a valid time range like 08:00 - 09:00."); setSaving(false); return; }
     const{start,end}=parseTimeRange(form.time);
     if(start===null||end===null||end<=start) { setError("End time must be after start time."); setSaving(false); return; }
-    const payload={...form,time:normalizeTimeRange(form.time),academicStage:(isFaculty?facultyScope?.faculty?.department:form.department)===hnditDepartment?form.academicStage:"",department:isFaculty?undefined:form.department};
+    const payload={...form,time:normalizeTimeRange(form.time),academicStage:form.academicStage,department:isFaculty?undefined:form.department};
     try {
       const saved=editingId ? await apiFetch(`/api/timetable/${editingId}`,{method:"PUT",body:JSON.stringify(payload)}) : await apiFetch("/api/timetable",{method:"POST",body:JSON.stringify(payload)});
       setEntries(cur=>sortEntries(editingId?cur.map(i=>i._id===saved._id?saved:i):[saved,...cur]));
@@ -122,7 +128,7 @@ export default function TimetablePage() {
   };
 
   const deleteEntry = async (entry) => {
-    if(!window.confirm(`Delete ${entry.subject} from ${entry.day}?`)) return;
+    if(!await confirm({ title: "Delete timetable period?", message: `Delete ${entry.subject} from ${entry.day}?`, confirmLabel: "Delete period", tone: "danger" })) return;
     setError(""); setStatus("");
     try { await apiFetch(`/api/timetable/${entry._id}`,{method:"DELETE"}); setEntries(cur=>cur.filter(i=>i._id!==entry._id)); setStatus("Timetable period deleted."); }
     catch(err) { setError(err?.message||"Unable to delete."); }
@@ -168,7 +174,7 @@ export default function TimetablePage() {
             </div>
             <div className="grid gap-3 lg:grid-cols-3">
               {!isFaculty ? (
-                <select value={form.department} onChange={e=>setForm(c=>({...c,department:e.target.value,academicStage:e.target.value===hnditDepartment?c.academicStage:""}))} className="portal-input">
+                <select value={form.department} onChange={e=>setForm(c=>({...c,department:e.target.value,academicStage:"",lecturer:""}))} className="portal-input">
                   {departments.map(d=><option key={d} value={d}>{d}</option>)}
                 </select>
               ) : (
@@ -177,12 +183,10 @@ export default function TimetablePage() {
               <select value={form.day} onChange={e=>setForm(c=>({...c,day:e.target.value}))} className="portal-input">
                 {days.map(d=><option key={d} value={d}>{d}</option>)}
               </select>
-              {((isFaculty?facultyScope?.faculty?.department:form.department)===hnditDepartment) && (
-                <select value={form.academicStage} onChange={e=>setForm(c=>({...c,academicStage:e.target.value}))} className="portal-input">
-                  <option value="">All HNDIT groups</option>
-                  {hnditAcademicStages.map(s=><option key={s} value={s}>{s}</option>)}
-                </select>
-              )}
+              <select value={form.academicStage} onChange={e=>setForm(c=>({...c,academicStage:e.target.value}))} className="portal-input">
+                <option value="">All study years</option>
+                {academicStages.map(s=><option key={s} value={s}>{s}</option>)}
+              </select>
               <label className="space-y-1">
                 <input required value={form.time} onChange={e=>setForm(c=>({...c,time:e.target.value}))} list="tt-slots" placeholder="08:00 - 09:00" className="portal-input"/>
                 <datalist id="tt-slots">{defaultTimeSlots.map(s=><option key={s} value={s}/>)}</datalist>
@@ -197,7 +201,10 @@ export default function TimetablePage() {
                   ))}
                 </div>
               </label>
-              <input value={form.lecturer} onChange={e=>setForm(c=>({...c,lecturer:e.target.value}))} placeholder="Lecturer" className="portal-input"/>
+              <select required={!isNonClassPeriod(form.subject)} value={form.lecturer} onChange={e=>setForm(c=>({...c,lecturer:e.target.value}))} disabled={isNonClassPeriod(form.subject)} className="portal-input">
+                <option value="">{isNonClassPeriod(form.subject)?"No lecturer required":"Select registered lecturer"}</option>
+                {availableLecturers.map(lecturer=><option key={lecturer._id} value={lecturer.fullName}>{lecturer.fullName} - {lecturer.staffType}</option>)}
+              </select>
               <input value={form.room} onChange={e=>setForm(c=>({...c,room:e.target.value}))} placeholder="Room" className="portal-input"/>
             </div>
             <button type="submit" disabled={saving} className="portal-btn-primary"><Save size={15}/> {saving?"Saving…":editingId?"Update Period":"Create Period"}</button>
@@ -305,7 +312,7 @@ export default function TimetablePage() {
               <select value={overviewGroupFilter} onChange={e=>setOverviewGroupFilter(e.target.value)} className="portal-input" style={{width:"16rem"}}>
                 <option value="all">All groups</option>
                 <option value="">All-group periods only</option>
-                {hnditAcademicStages.map(s=><option key={s} value={s}>{s}</option>)}
+                {academicStages.map(s=><option key={s} value={s}>{s}</option>)}
               </select>
             </label>
           </div>

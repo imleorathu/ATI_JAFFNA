@@ -1,10 +1,10 @@
 import AttendanceRecord from "../models/AttendanceRecord.js";
-import Faculty from "../models/Faculty.js";
 import Student from "../models/Student.js";
 import TimetableEntry from "../models/TimetableEntry.js";
 import User from "../models/User.js";
+import { getDepartmentScope } from "../middleware/departmentAccess.js";
 
-const departmentBasedFacultyTypes = ["Teaching Staff", "Head of the department"];
+const facultyScope = getDepartmentScope;
 const campusLatitude = Number(process.env.ATI_CAMPUS_LAT || 9.651841);
 const campusLongitude = Number(process.env.ATI_CAMPUS_LNG || 80.023445);
 const allowedRadiusMeters = Number(process.env.ATTENDANCE_RADIUS_METERS || 500);
@@ -44,19 +44,6 @@ function distanceMeters(lat1, lon1, lat2, lon2) {
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
       Math.sin(dLon / 2) * Math.sin(dLon / 2);
   return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-async function facultyScope(req) {
-  const user = await User.findById(req.user.id).select("email");
-  if (!user) return { error: "User account not found." };
-
-  const faculty = await Faculty.findOne({ email: String(user.email || "").trim().toLowerCase() });
-  if (!faculty) return { error: "Faculty profile not found for this account." };
-  if (!departmentBasedFacultyTypes.includes(faculty.staffType) || !faculty.department) {
-    return { error: "This staff account is not assigned to a student department." };
-  }
-
-  return { faculty, department: faculty.department };
 }
 
 async function studentScope(req) {

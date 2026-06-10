@@ -26,7 +26,6 @@ import AssignmentsPage from "./pages/dashboard/AssignmentsPage.jsx";
 import FeesPage from "./pages/dashboard/FeesPage.jsx";
 import LMSDashboard from "./pages/lms/LMSDashboard.jsx";
 import FacultyDashboard from "./pages/faculty/FacultyDashboard.jsx";
-import ParentPortal from "./pages/parent/ParentPortal.jsx";
 import MessagesPage from "./pages/communication/MessagesPage.jsx";
 import AnalyticsPage from "./pages/dashboard/AnalyticsPage.jsx";
 import SettingsPage from "./pages/dashboard/SettingsPage.jsx";
@@ -36,7 +35,7 @@ import { useAuth } from "./contexts/AuthContext.jsx";
 
 function MainSite() {
   const location = useLocation();
-  const hideAi = ["/login", "/register", "/change-password", "/faculty", "/parent"].some((path) => location.pathname.startsWith(path));
+  const hideAi = ["/login", "/register", "/change-password", "/faculty"].some((path) => location.pathname.startsWith(path));
 
   return (
     <>
@@ -72,7 +71,6 @@ function PortalPlaceholder({ title }) {
 
 function StudentRoutes() {
   const { user, isAuthenticated } = useAuth();
-  const isPartTimeStudent = String(user?.studentProfile?.studyMode || "").toLowerCase().replace(/\s+/g, "-") === "part-time";
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -89,8 +87,7 @@ function StudentRoutes() {
         <Route path="assignments" element={<AssignmentsPage />} />
         <Route path="messages" element={<MessagesPage />} />
         <Route path="announcements" element={<MessagesPage />} />
-        <Route path="settings" element={<PortalPlaceholder title="Student Settings" />} />
-        <Route path="fees" element={isPartTimeStudent ? <FeesPage /> : <Navigate to="/student" replace />} />
+        <Route path="fees" element={<FeesPage />} />
         <Route path="ai-assistant" element={<AIAssistant />} />
         <Route path="*" element={<Navigate to="/student" replace />} />
       </Routes>
@@ -108,10 +105,9 @@ function AdminRoutes() {
   return (
     <DashboardLayout user={user}>
       <Routes>
-        <Route path="" element={<AdminDashboard />} />
-        <Route path="courses" element={<CourseManagement />} />
-        <Route path="assignments" element={<AssignmentsPage />} />
+        <Route path="" element={<AdminDashboard user={user} />} />
         <Route path="grades" element={<GradesPage />} />
+        <Route path="fees" element={<FeesPage />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="students" element={<StudentManagement />} />
         <Route path="faculty" element={<FacultyManagement />} />
@@ -136,12 +132,13 @@ function FacultyRoutes() {
   return (
     <DashboardLayout user={user}>
       <Routes>
-        <Route path="" element={<FacultyDashboard />} />
+        <Route path="" element={<FacultyDashboard user={user} />} />
         <Route path="students" element={<StudentManagement />} />
         <Route path="my-classes" element={<CourseManagement />} />
         <Route path="timetable" element={<TimetablePage />} />
         <Route path="attendance" element={<AttendancePage />} />
         <Route path="grades" element={<GradesPage />} />
+        <Route path="fees" element={<FeesPage />} />
         <Route path="assignments" element={<AssignmentsPage />} />
         <Route path="ai-assistant" element={<AIAssistant />} />
         <Route path="exams" element={<ExamsPage />} />
@@ -152,7 +149,7 @@ function FacultyRoutes() {
   );
 }
 
-function ParentRoutes() {
+function FinanceRoutes() {
   const { user, isAuthenticated } = useAuth();
 
   if (!isAuthenticated) {
@@ -162,12 +159,12 @@ function ParentRoutes() {
   return (
     <DashboardLayout user={user}>
       <Routes>
-        <Route path="" element={<ParentPortal />} />
-        <Route path="student-progress" element={<GradesPage />} />
-        <Route path="attendance" element={<AttendancePage />} />
+        <Route path="" element={<FeesPage />} />
         <Route path="fees" element={<FeesPage />} />
+        <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="messages" element={<MessagesPage />} />
-        <Route path="*" element={<Navigate to="/parent" replace />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="*" element={<Navigate to="/finance" replace />} />
       </Routes>
     </DashboardLayout>
   );
@@ -179,7 +176,7 @@ export default function App() {
       <Route path="/student/*" element={<StudentRoutes />} />
       <Route path="/admin/*" element={<AdminRoutes />} />
       <Route path="/faculty/*" element={<FacultyRoutes />} />
-      <Route path="/parent/*" element={<ParentRoutes />} />
+      <Route path="/finance/*" element={<FinanceRoutes />} />
       <Route path="/*" element={<MainSite />} />
     </Routes>
   );

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Download, Edit3, FileSpreadsheet, Mail, Phone, Plus, Search, Trash2, Upload, UserRound, X } from "lucide-react";
+import { CheckCircle2, Download, Edit3, Mail, Phone, Plus, Search, Trash2, UserRound, X } from "lucide-react";
 import GlassCard from "../../components/GlassCard";
+import AppModal from "../../components/AppModal.jsx";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiFetch, downloadCsv } from "../../lib/api";
+import { useModal } from "../../contexts/ModalContext.jsx";
 
 const initialForm = {
   fullName: "",
@@ -23,7 +25,7 @@ const initialForm = {
   confirmPassword: ""
 };
 
-const departments = [
+const fallbackDepartments = [
   "Higher National Diploma in Accountancy - (HNDA)",
   "Higher National Diploma in English",
   "Higher National Diploma in Engineering - Civil",
@@ -33,28 +35,12 @@ const departments = [
   "Higher National Diploma in Quantity Surveying"
 ];
 const studyModes = ["Full-time", "Part-time"];
-const hnditDepartment = "Higher National Diploma in Information Technology - (HNDIT)";
-const hnditAcademicStages = [
+const academicStages = [
   "First year Full Time",
   "Second year Full Time",
   "First year Part Time",
   "Second year Part Time"
 ];
-const importColumns = [
-  "Full Name",
-  "Student ID",
-  "NIC",
-  "Email Address",
-  "Phone Number",
-  "Department / HND Programme",
-  "HNDIT Student Group",
-  "Study Mode",
-  "Guardian Name",
-  "Guardian Phone",
-  "Password",
-  "Confirm Password"
-];
-
 const paymentStyles = {
   not_required: "bg-[color:var(--md-hover)] text-[color:var(--md-text-secondary)]",
   paid: "bg-emerald-500/15 text-[color:var(--md-success)]",
@@ -70,9 +56,11 @@ const paymentLabels = {
 };
 
 export default function StudentManagement() {
+  const { confirm } = useModal();
   const { user } = useAuth();
   const isFaculty = String(user?.role || "").toLowerCase() === "lecturer";
   const [students, setStudents] = useState([]);
+  const [departments, setDepartments] = useState(fallbackDepartments);
   const [facultyScope, setFacultyScope] = useState(null);
   const [search, setSearch] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
@@ -83,13 +71,21 @@ export default function StudentManagement() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
 
-  const loadStudents = async () => {
-    setLoading(true);
+  const loadDepartments = async () => {
+    try {
+      const data = await apiFetch("/api/departments");
+      const names = Array.isArray(data) ? data.map((department) => department.name).filter(Boolean) : [];
+      if (names.length) setDepartments(names);
+    } catch {
+      setDepartments(fallbackDepartments);
+    }
+  };
+
+  const loadStudents = async (silent = false) => {
+    if (!silent) setLoading(true);
     setError("");
     try {
       if (isFaculty) {
@@ -102,12 +98,32 @@ export default function StudentManagement() {
     } catch (err) {
       setError(err?.message || "Unable to load students.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
+    loadDepartments();
     loadStudents();
+    const refreshStudents = () => loadStudents(true);
+    const refreshAfterPayment = (event) => {
+      const studentId = event.detail?.studentId;
+      const paymentStatus = event.detail?.paymentStatus;
+      if (studentId && paymentStatus) {
+        setStudents((current) =>
+          current.map((student) => (String(student._id) === String(studentId) ? { ...student, paymentStatus } : student))
+        );
+      }
+      loadStudents(true);
+    };
+    const intervalId = window.setInterval(refreshStudents, 15000);
+    window.addEventListener("focus", refreshStudents);
+    window.addEventListener("ati-student-payment-updated", refreshAfterPayment);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshStudents);
+      window.removeEventListener("ati-student-payment-updated", refreshAfterPayment);
+    };
   }, []);
 
   const filteredStudents = useMemo(() => {
@@ -146,8 +162,8 @@ export default function StudentManagement() {
       total: students.length,
       fullTime: students.filter((student) => student.studyMode === "Full-time").length,
       partTime: students.filter((student) => student.studyMode === "Part-time").length,
-      hnditGroups: hnditAcademicStages.reduce((acc, stage) => {
-        acc[stage] = students.filter((student) => student.department === hnditDepartment && student.academicStage === stage).length;
+      academicStageGroups: academicStages.reduce((acc, stage) => {
+        acc[stage] = students.filter((student) => student.academicStage === stage).length;
         return acc;
       }, {}),
       noPayment: students.filter((student) => student.paymentStatus === "not_required" || student.studyMode === "Full-time").length,
@@ -164,22 +180,27 @@ export default function StudentManagement() {
     setShowForm(false);
   };
 
-  const setFormStudyMode = (studyMode) => {
-    setForm((current) => ({
-      ...current,
-      studyMode,
-      academicStage: current.department === hnditDepartment && current.academicStage.includes(studyMode === "Part-time" ? "Full Time" : "Part Time") ? "" : current.academicStage,
-      paymentStatus: studyMode === "Full-time" ? "not_required" : current.paymentStatus === "not_required" ? "pending" : current.paymentStatus
-    }));
-  };
-
   const setFormDepartment = (department) => {
     setForm((current) => ({
       ...current,
       department,
-      program: department,
-      academicStage: department === hnditDepartment ? current.academicStage : ""
+      program: department
     }));
+  };
+
+  const setFormStudyMode = (studyMode) => {
+    setForm((current) => {
+      const incompatibleStage = studyMode === "Full-time" ? "Part Time" : "Full Time";
+      const academicStage = current.academicStage.includes(incompatibleStage)
+        ? academicStages.find((stage) => stage.includes(studyMode === "Full-time" ? "Full Time" : "Part Time")) || ""
+        : current.academicStage;
+      return {
+        ...current,
+        studyMode,
+        academicStage,
+        paymentStatus: studyMode === "Full-time" ? "not_required" : current.paymentStatus === "not_required" ? "pending" : current.paymentStatus
+      };
+    });
   };
 
   const setFormAcademicStage = (academicStage) => {
@@ -259,7 +280,7 @@ export default function StudentManagement() {
   };
 
   const deleteStudent = async (student) => {
-    const confirmed = window.confirm(`Delete ${student.fullName}?`);
+    const confirmed = await confirm({ title: "Delete student?", message: `Delete ${student.fullName} and the linked login account?`, confirmLabel: "Delete student", tone: "danger" });
     if (!confirmed) return;
 
     setError("");
@@ -293,48 +314,6 @@ export default function StudentManagement() {
     );
   };
 
-  const downloadTemplate = () => {
-    downloadCsv("ati-student-import-template.csv", [
-      {
-        "Full Name": "K. Vishwa",
-        "Student ID": "ATI2026001",
-        NIC: "200012345678",
-        "Email Address": "student@gmail.com",
-        "Phone Number": "0771234567",
-        "Department / HND Programme": "Higher National Diploma in Information Technology - (HNDIT)",
-        "HNDIT Student Group": "First year Full Time",
-        "Study Mode": "Full Time",
-        "Guardian Name": "Mr. Kumar",
-        "Guardian Phone": "0779876543",
-        Password: "ATI2026001",
-        "Confirm Password": "ATI2026001"
-      }
-    ]);
-  };
-
-  const uploadStudents = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    setImporting(true);
-    setError("");
-    setStatus("");
-    setImportResult(null);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const result = await apiFetch("/api/students/import", { method: "POST", body: formData });
-      setImportResult(result);
-      setStatus(`${result.inserted} students imported. ${result.invalid} rows need correction.`);
-      await loadStudents();
-    } catch (err) {
-      setError(err?.message || "Unable to import students.");
-    } finally {
-      setImporting(false);
-    }
-  };
-
   const departmentBreakdown = useMemo(
     () =>
       departments
@@ -344,7 +323,7 @@ export default function StudentManagement() {
           partTime: students.filter((student) => student.department === department && student.studyMode === "Part-time").length
         }))
         .filter((item) => item.fullTime + item.partTime > 0),
-    [students]
+    [departments, students]
   );
 
   return (
@@ -368,23 +347,6 @@ export default function StudentManagement() {
             <Download size={16} />
             Export
           </button>
-          {!isFaculty && (
-            <>
-              <button
-                type="button"
-                onClick={downloadTemplate}
-                className="portal-btn"
-              >
-                <FileSpreadsheet size={16} />
-                Template
-              </button>
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-emerald-400 px-3 py-2 text-sm font-bold text-slate-950 transition hover:bg-emerald-300">
-                <Upload size={16} />
-                {importing ? "Uploading..." : "Upload Students"}
-                <input type="file" accept=".csv,.xls,.xlsx" onChange={uploadStudents} disabled={importing} className="hidden" />
-              </label>
-            </>
-          )}
           <button
             type="button"
             onClick={() => {
@@ -402,58 +364,6 @@ export default function StudentManagement() {
 
       {error && <div className="portal-alert-danger">{error}</div>}
       {status && <div className="portal-alert-success">{status}</div>}
-
-      {!isFaculty && <GlassCard className="p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="classroom-section-title">Bulk Student Upload</h2>
-            <p className="portal-page-subtitle">Upload CSV, XLS, or XLSX files, including Google Forms CSV exports. Password columns are optional; the initial password is the Student ID.</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={downloadTemplate} className="portal-btn">
-              <Download size={16} />
-              Sample CSV
-            </button>
-          </div>
-        </div>
-        <div className="mt-4 rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[color:var(--md-text-secondary)]">Accepted columns</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {importColumns.map((column) => (
-              <span key={column} className="rounded-full bg-[color:var(--md-hover)] px-2.5 py-1 text-xs font-bold text-[color:var(--md-text-secondary)]">{column}</span>
-            ))}
-          </div>
-        </div>
-        {importResult?.invalidRows?.length > 0 && (
-          <div className="mt-4 overflow-x-auto rounded-lg border border-amber-400/20">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="bg-amber-500/10 text-xs uppercase tracking-[0.12em] text-[color:var(--md-warning)]">
-                <tr>
-                  <th className="px-3 py-2">Row</th>
-                  <th className="px-3 py-2">Student ID</th>
-                  <th className="px-3 py-2">Email</th>
-                  <th className="px-3 py-2">Errors</th>
-                </tr>
-              </thead>
-              <tbody>
-                {importResult.invalidRows.map((row) => (
-                  <tr key={`${row.rowNumber}-${row.studentId || row.email}`} className="border-t border-[color:var(--md-border)]">
-                    <td className="px-3 py-2 font-bold text-[color:var(--md-text-primary)]">{row.rowNumber}</td>
-                    <td className="px-3 py-2 text-[color:var(--md-text-secondary)]">{row.studentId || "Missing"}</td>
-                    <td className="px-3 py-2 text-[color:var(--md-text-secondary)]">{row.email || "Missing"}</td>
-                    <td className="px-3 py-2 text-[color:var(--md-text-primary)]">
-                      <span className="inline-flex items-start gap-2">
-                        <AlertTriangle size={15} className="mt-0.5 shrink-0" />
-                        {row.errors.join(", ")}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </GlassCard>}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
@@ -477,20 +387,19 @@ export default function StudentManagement() {
         ))}
       </div>
 
-      {(isFaculty ? facultyScope?.faculty?.department === hnditDepartment : true) && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {hnditAcademicStages.map((stage) => (
-            <GlassCard key={stage} dark className="p-5">
-              <p className="portal-stat-label">{stage}</p>
-              <p className="portal-stat-value" style={{color:"var(--color-ocean)"}}>{stats.hnditGroups[stage] || 0}</p>
-              <p className="mt-1 text-xs font-semibold text-[color:var(--md-text-secondary)]">HNDIT students</p>
-            </GlassCard>
-          ))}
-        </div>
-      )}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {academicStages.map((stage) => (
+          <GlassCard key={stage} dark className="p-5">
+            <p className="portal-stat-label">{stage}</p>
+            <p className="portal-stat-value" style={{color:"var(--color-ocean)"}}>{stats.academicStageGroups[stage] || 0}</p>
+            <p className="mt-1 text-xs font-semibold text-[color:var(--md-text-secondary)]">Students</p>
+          </GlassCard>
+        ))}
+      </div>
 
       {showForm && (
-        <GlassCard className="p-5">
+        <AppModal open={showForm} onClose={resetForm} size="lg" hideClose>
+        <GlassCard className="m-0 p-5">
           <form onSubmit={saveStudent} className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="classroom-section-title">{editingId ? "Edit Student" : "Add Student"}</h2>
@@ -564,23 +473,25 @@ export default function StudentManagement() {
                 placeholder="Academic year"
                 className="portal-input"
               />
-              {(form.department === hnditDepartment || (isFaculty && facultyScope?.faculty?.department === hnditDepartment)) && (
-                <select
-                  required
-                  value={form.academicStage}
-                  onChange={(event) => setFormAcademicStage(event.target.value)}
-                  className="portal-input"
-                >
-                  <option value="">HNDIT student group</option>
-                  {hnditAcademicStages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
-                </select>
-              )}
               <select
                 value={form.studyMode}
                 onChange={(event) => setFormStudyMode(event.target.value)}
                 className="portal-input"
               >
-                {studyModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}
+                {studyModes.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {mode === "Full-time" ? "Full Time" : "Part Time"}
+                  </option>
+                ))}
+              </select>
+              <select
+                required
+                value={form.academicStage}
+                onChange={(event) => setFormAcademicStage(event.target.value)}
+                className="portal-input"
+              >
+                <option value="">Current Study year</option>
+                {academicStages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
               </select>
               <input
                 value={form.guardianName}
@@ -633,6 +544,7 @@ export default function StudentManagement() {
             </button>
           </form>
         </GlassCard>
+        </AppModal>
       )}
 
       <GlassCard className="p-5">
@@ -655,7 +567,6 @@ export default function StudentManagement() {
                 value={departmentFilter}
                 onChange={(event) => {
                   setDepartmentFilter(event.target.value);
-                  if (event.target.value !== hnditDepartment && event.target.value !== "all") setAcademicStageFilter("all");
                 }}
                 className="portal-input"
               >
@@ -667,12 +578,10 @@ export default function StudentManagement() {
               <option value="all">All study modes</option>
               {studyModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}
             </select>
-            {(isFaculty ? facultyScope?.faculty?.department === hnditDepartment : departmentFilter === hnditDepartment || departmentFilter === "all") && (
-              <select value={academicStageFilter} onChange={(event) => setAcademicStageFilter(event.target.value)} className="portal-input">
-                <option value="all">All HNDIT groups</option>
-                {hnditAcademicStages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
-              </select>
-            )}
+            <select value={academicStageFilter} onChange={(event) => setAcademicStageFilter(event.target.value)} className="portal-input">
+              <option value="all">All current study years</option>
+              {academicStages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
+            </select>
           </div>
         </div>
 

@@ -41,8 +41,7 @@ const pageContentSchema = new mongoose.Schema(
       required: true,
       unique: true,
       trim: true,
-      lowercase: true,
-      enum: ["home", "about", "faculties", "courses", "news", "contact"]
+      lowercase: true
     },
     title: { type: String, required: true, trim: true },
     status: { type: String, enum: ["draft", "published", "unpublished"], default: "draft" },

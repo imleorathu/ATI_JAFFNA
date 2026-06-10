@@ -1,679 +1,1266 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Wallet, CreditCard, Download, Clock, CheckCircle, AlertTriangle,
-  TrendingDown, TrendingUp, Banknote, Receipt, Bell, Award
+  AlertTriangle,
+  Banknote,
+  Bell,
+  CheckCircle,
+  CreditCard,
+  Download,
+  FileText,
+  Plus,
+  Receipt,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Wallet
 } from "lucide-react";
 import {
-  PieChart, Pie, Cell, BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
 } from "recharts";
-import GlassCard from "../../components/GlassCard";
-import { feeData } from "../../data";
+import { feesApi, downloadFeeFile } from "../../lib/feesApi";
+import { apiFetch, downloadCsv } from "../../lib/api";
+import { useAuth } from "../../contexts/AuthContext";
 
-const feeCategories = [
-  { name: "Tuition", value: 85000, color: "var(--color-ocean)" },
-  { name: "Library", value: 7500, color: "var(--color-mint)" },
-  { name: "Lab", value: 15000, color: "#f59e0b" },
-  { name: "Sports", value: 5000, color: "#8b5cf6" },
-  { name: "Other", value: 12500, color: "#ef4444" },
+const currency = (value) => `LKR ${Number(value || 0).toLocaleString()}`;
+const today = new Date().toISOString().slice(0, 10);
+
+const tabs = [
+  ["records", "Fee Records"],
+  ["structures", "Structures"],
+  ["payments", "Payments"],
+  ["invoices", "Invoices"],
+  ["outstanding", "Outstanding"],
+  ["receipts", "Receipts"],
+  ["refunds", "Refunds"],
+  ["notifications", "Notifications"],
+  ["requests", "Requests"],
+  ["reports", "Reports"]
 ];
 
-const installments = [
-  { month: "January", amount: 45000, status: "paid", dueDate: "2026-01-15", paidDate: "2026-01-14" },
-  { month: "March", amount: 42500, status: "paid", dueDate: "2026-03-10", paidDate: "2026-03-08" },
-  { month: "May", amount: 37500, status: "pending", dueDate: "2026-05-01", paidDate: null },
-  { month: "July", amount: 40000, status: "upcoming", dueDate: "2026-07-01", paidDate: null },
-  { month: "September", amount: 35000, status: "upcoming", dueDate: "2026-09-01", paidDate: null },
-  { month: "November", amount: 30000, status: "upcoming", dueDate: "2026-11-01", paidDate: null },
-];
+function roleInfo(user) {
+  const role = String(user?.role || "student").toLowerCase();
+  const normalized = role === "lecturer" ? "department_staff" : role;
+  return {
+    role: normalized,
+    isAdmin: normalized === "admin",
+    isFinance: normalized === "finance_officer",
+    isDepartmentStaff: normalized === "department_staff",
+    isStudent: normalized === "student",
+    departmentId: user?.department_id || user?.staffProfile?.department || user?.studentProfile?.department || ""
+  };
+}
 
-const nextPaymentDate = "2026-05-01";
+function StatusPill({ status }) {
+  const palette = {
+    paid: "bg-emerald-500/10 text-emerald-600",
+    validated: "bg-emerald-500/10 text-emerald-600",
+    approved: "bg-emerald-500/10 text-emerald-600",
+    partial: "bg-amber-500/10 text-amber-600",
+    pending: "bg-amber-500/10 text-amber-600",
+    requested: "bg-amber-500/10 text-amber-600",
+    unpaid: "bg-rose-500/10 text-rose-600",
+    overdue: "bg-rose-500/10 text-rose-600",
+    rejected: "bg-rose-500/10 text-rose-600"
+  };
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-bold capitalize ${palette[status] || "bg-slate-500/10 text-slate-600"}`}>{status || "draft"}</span>;
+}
 
-const stagger = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.06 } },
-};
+function MetricCard({ label, value, icon: Icon, tone = "text-[color:var(--md-primary)]" }) {
+  return (
+    <div className="rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-[color:var(--md-text-secondary)]">{label}</p>
+          <p className="mt-2 text-xl font-black text-[color:var(--md-text-primary)]">{value}</p>
+        </div>
+        <Icon className={tone} size={22} />
+      </div>
+    </div>
+  );
+}
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.25, 0.46, 0.45, 0.94] } },
-};
+function Field({ label, children }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-[color:var(--md-text-secondary)]">{label}</span>
+      {children}
+    </label>
+  );
+}
 
-const RADIUS = 64;
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+function Input(props) {
+  return <input {...props} className={`w-full rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] px-3 py-2 text-sm text-[color:var(--md-text-primary)] outline-none focus:border-[color:var(--md-primary)] ${props.className || ""}`} />;
+}
+
+function Select(props) {
+  return <select {...props} className={`w-full rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] px-3 py-2 text-sm text-[color:var(--md-text-primary)] outline-none focus:border-[color:var(--md-primary)] ${props.className || ""}`} />;
+}
+
+function PrimaryButton(props) {
+  return (
+    <button {...props} className={`inline-flex items-center justify-center gap-2 rounded-lg bg-[color:var(--md-primary)] px-4 py-2 text-sm font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${props.className || ""}`}>
+      {props.children}
+    </button>
+  );
+}
+
+function SecondaryButton(props) {
+  return (
+    <button {...props} className={`inline-flex items-center justify-center gap-2 rounded-lg border border-[color:var(--md-border)] px-4 py-2 text-sm font-bold text-[color:var(--md-text-primary)] transition hover:bg-[color:var(--md-hover)] disabled:cursor-not-allowed disabled:opacity-60 ${props.className || ""}`}>
+      {props.children}
+    </button>
+  );
+}
 
 export default function FeesPage() {
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState(feeData.due);
-  const [paymentMethod, setPaymentMethod] = useState("card");
-  const [processing, setProcessing] = useState(false);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [reminderEnabled, setReminderEnabled] = useState(true);
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const access = roleInfo(user);
+  const [tab, setTab] = useState("records");
+  const [filters, setFilters] = useState({
+    search: "",
+    departmentId: access.isDepartmentStaff ? access.departmentId : "",
+    semester: "",
+    status: ""
+  });
+  const [message, setMessage] = useState("");
 
-  const paidPercent = feeData.totalFee > 0
-    ? Math.round((feeData.paid / feeData.totalFee) * 100)
-    : 0;
+  const queryParams = useMemo(
+    () => Object.fromEntries(Object.entries(filters).filter(([, value]) => value)),
+    [filters]
+  );
 
-  const handlePayment = () => {
-    setProcessing(true);
-    setTimeout(() => {
-      setProcessing(false);
-      setPaymentSuccess(true);
-      setTimeout(() => {
-        setShowPaymentModal(false);
-        setPaymentSuccess(false);
-      }, 2000);
-    }, 2000);
+  const dashboard = useQuery({ queryKey: ["fees-dashboard", queryParams], queryFn: () => feesApi.dashboard(queryParams) });
+  const departments = useQuery({ queryKey: ["departments"], queryFn: () => apiFetch("/api/departments") });
+  const records = useQuery({ queryKey: ["student-fees", queryParams], queryFn: () => feesApi.studentFees(queryParams) });
+  const categories = useQuery({ queryKey: ["fee-categories"], queryFn: feesApi.categories });
+  const structures = useQuery({ queryKey: ["fee-structures", queryParams], queryFn: () => feesApi.structures(queryParams), enabled: tab === "structures" });
+  const payments = useQuery({ queryKey: ["fee-payments", queryParams], queryFn: () => feesApi.payments(queryParams), enabled: access.isStudent || tab === "payments" || tab === "refunds" });
+  const invoices = useQuery({ queryKey: ["fee-invoices", queryParams], queryFn: () => feesApi.invoices(queryParams), enabled: access.isStudent || tab === "invoices" });
+  const receipts = useQuery({ queryKey: ["fee-receipts", queryParams], queryFn: () => feesApi.receipts(queryParams), enabled: access.isStudent || tab === "receipts" });
+  const outstanding = useQuery({ queryKey: ["fee-outstanding", queryParams], queryFn: () => feesApi.outstanding(queryParams), enabled: tab === "outstanding" });
+  const refunds = useQuery({ queryKey: ["fee-refunds", queryParams], queryFn: () => feesApi.refunds(queryParams), enabled: access.isStudent || tab === "refunds" });
+  const notifications = useQuery({ queryKey: ["fee-notifications", queryParams], queryFn: () => feesApi.notifications(queryParams), enabled: access.isStudent || tab === "notifications" });
+  const serviceRequests = useQuery({ queryKey: ["fee-service-requests", queryParams], queryFn: () => feesApi.serviceRequests(queryParams), enabled: access.isStudent || tab === "requests" });
+
+  const refreshAll = () => {
+    queryClient.invalidateQueries();
+    setMessage("Fee data refreshed.");
   };
 
-  const handleDownload = () => {
-    const element = document.createElement("a");
-    element.setAttribute("href", "data:text/plain;charset=utf-8,Fee Receipt - ATI Jaffna");
-    element.setAttribute("download", "fee_receipt.txt");
-    element.style.display = "none";
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-  };
+  const createFee = useMutation({
+    mutationFn: feesApi.createStudentFee,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries();
+      setMessage(data?.message || "Department semester fee created.");
+    },
+    onError: (error) => setMessage(error.message)
+  });
+  const recordPayment = useMutation({
+    mutationFn: feesApi.recordPayment,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries();
+      window.dispatchEvent(new CustomEvent("ati-student-payment-updated", {
+        detail: {
+          studentId: data?.payment?.student,
+          paymentStatus: data?.studentPaymentStatus
+        }
+      }));
+      setMessage("Payment recorded and receipt generated.");
+    },
+    onError: (error) => setMessage(error.message)
+  });
+  const createStructure = useMutation({
+    mutationFn: feesApi.createStructure,
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setMessage("Fee structure saved.");
+    },
+    onError: (error) => setMessage(error.message)
+  });
+  const generateInvoice = useMutation({
+    mutationFn: feesApi.generateInvoice,
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setMessage("Invoice generated.");
+    },
+    onError: (error) => setMessage(error.message)
+  });
+  const submitRefund = useMutation({
+    mutationFn: feesApi.submitRefund,
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setMessage("Refund request submitted.");
+    },
+    onError: (error) => setMessage(error.message)
+  });
+  const reviewRefund = useMutation({
+    mutationFn: ({ id, action }) => feesApi.reviewRefund(id, { action }),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setMessage("Refund workflow updated.");
+    },
+    onError: (error) => setMessage(error.message)
+  });
+  const notify = useMutation({
+    mutationFn: feesApi.createNotification,
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setMessage("Notification queued.");
+    },
+    onError: (error) => setMessage(error.message)
+  });
+  const createServiceRequest = useMutation({
+    mutationFn: feesApi.createServiceRequest,
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setMessage("Request submitted for admin review.");
+    },
+    onError: (error) => setMessage(error.message)
+  });
+  const reviewServiceRequest = useMutation({
+    mutationFn: ({ id, status }) => feesApi.reviewServiceRequest(id, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setMessage("Student fee request updated.");
+    },
+    onError: (error) => setMessage(error.message)
+  });
 
-  const paymentMethods = [
-    { id: "card", label: "Credit / Debit Card", icon: CreditCard },
-    { id: "bank", label: "Bank Transfer", icon: Banknote },
-    { id: "wallet", label: "Digital Wallet", icon: Wallet },
-  ];
+  const widgets = dashboard.data?.widgets || {};
+  const chartColors = ["#0d6efd", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6"];
+  const feeRows = records.data?.data || [];
+  const departmentOptions = Array.isArray(departments.data) ? departments.data : departments.data?.data || [];
+
+  const handleFilter = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
+  const firstFee = feeRows.find((fee) => fee.status !== "paid") || feeRows[0];
+  const firstPayment = payments.data?.data?.[0];
+
+  const canManageFees = access.isAdmin || access.isFinance || access.isDepartmentStaff;
+  const canManageMoney = access.isAdmin || access.isFinance;
+
+  if (access.isStudent) {
+    return (
+      <StudentFeesPortal
+        dashboard={dashboard}
+        feeRows={feeRows}
+        payments={payments}
+        invoices={invoices}
+        receipts={receipts}
+        refunds={refunds}
+        notifications={notifications}
+        serviceRequests={serviceRequests}
+        recordPayment={recordPayment}
+        createServiceRequest={createServiceRequest}
+        message={message}
+        setMessage={setMessage}
+        refreshAll={refreshAll}
+      />
+    );
+  }
 
   return (
     <section className="space-y-6">
-      <div className="mx-auto max-w-7xl">
-        {/* Toast */}
-        {paymentSuccess && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="fixed right-6 top-6 z-50 flex items-center gap-3 rounded-xl border border-emerald-500/20 px-5 py-3 shadow-2xl backdrop-blur-xl"
-            style={{ background: "rgba(34,197,94,0.12)" }}
+      <div className="flex flex-col gap-4 border-b border-[color:var(--md-border)] pb-5 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="portal-page-label">Part-Time Fees</p>
+          <h1 className="mt-2 text-2xl font-black text-[color:var(--md-text-primary)] sm:text-3xl">Fees Management</h1>
+          <p className="mt-1 text-sm text-[color:var(--md-text-secondary)]">
+            Backend-enforced access: {access.isDepartmentStaff ? `department scope ${access.departmentId}` : access.isStudent ? "own student records only" : "institution-wide finance scope"}.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <SecondaryButton onClick={refreshAll}><RefreshCw size={16} /> Refresh</SecondaryButton>
+          <SecondaryButton onClick={() => downloadCsv("fee-records.csv", feeRows)}><Download size={16} /> CSV</SecondaryButton>
+        </div>
+      </div>
+
+      {message && (
+        <div className="flex items-center gap-2 rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] px-4 py-3 text-sm text-[color:var(--md-text-primary)]">
+          <ShieldCheck size={16} className="text-[color:var(--md-primary)]" />
+          {message}
+        </div>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Total Collected" value={currency(widgets.totalCollected)} icon={Banknote} tone="text-emerald-600" />
+        <MetricCard label="Outstanding" value={currency(widgets.totalOutstanding)} icon={AlertTriangle} tone="text-rose-600" />
+        <MetricCard label="Paid Students" value={widgets.paidStudents || 0} icon={CheckCircle} tone="text-emerald-600" />
+        <MetricCard label="Unpaid Students" value={widgets.unpaidStudents || 0} icon={Wallet} tone="text-amber-600" />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-5">
+        <div className="rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-4 xl:col-span-3">
+          <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">Monthly Revenue</h2>
+          <div className="mt-4 h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={dashboard.data?.monthlyRevenue || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--md-border)" />
+                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip formatter={(value) => currency(value)} />
+                <Bar dataKey="amount" fill="#0d6efd" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <div className="rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-4 xl:col-span-2">
+          <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">Department Revenue</h2>
+          <div className="mt-4 h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={dashboard.data?.departmentRevenue || []} dataKey="amount" nameKey="department" innerRadius={55} outerRadius={88}>
+                  {(dashboard.data?.departmentRevenue || []).map((entry, index) => <Cell key={entry.department} fill={chartColors[index % chartColors.length]} />)}
+                </Pie>
+                <Tooltip formatter={(value) => currency(value)} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-2 overflow-x-auto border-b border-[color:var(--md-border)] pb-2">
+        {tabs.map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={`shrink-0 rounded-lg px-3 py-2 text-sm font-bold ${tab === id ? "bg-[color:var(--md-primary)] text-white" : "text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)]"}`}
           >
-            <CheckCircle className="text-[color:var(--md-success)]" size={22} />
-            <div>
-              <p className="text-sm font-bold text-[color:var(--md-text-primary)]">Payment Successful!</p>
-              <p className="text-xs text-[color:var(--md-text-secondary)]">
-                LKR {paymentAmount.toLocaleString()} paid via{" "}
-                {paymentMethods.find((m) => m.id === paymentMethod)?.label}
-              </p>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid gap-3 rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-4 md:grid-cols-4">
+        <Field label="Search">
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 text-[color:var(--md-text-secondary)]" size={16} />
+            <Input value={filters.search} onChange={(event) => handleFilter("search", event.target.value)} placeholder="Student ID or name" className="pl-9" />
+          </div>
+        </Field>
+        <Field label="Department">
+          <Select value={filters.departmentId} disabled={access.isDepartmentStaff} onChange={(event) => handleFilter("departmentId", event.target.value)}>
+            <option value="">{departments.isLoading ? "Loading departments..." : "All departments"}</option>
+            {access.isDepartmentStaff && access.departmentId && <option value={access.departmentId}>{access.departmentId}</option>}
+            {departmentOptions.map((department) => (
+              <option key={department._id || department.name} value={department.name}>
+                {department.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Semester">
+          <Input value={filters.semester} onChange={(event) => handleFilter("semester", event.target.value)} placeholder="Semester 1" />
+        </Field>
+        <Field label="Payment Status">
+          <Select value={filters.status} onChange={(event) => handleFilter("status", event.target.value)}>
+            <option value="">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="partial">Partial</option>
+            <option value="paid">Paid</option>
+            <option value="overdue">Overdue</option>
+          </Select>
+        </Field>
+      </div>
+
+      {tab === "records" && (
+        <div className="grid gap-5 xl:grid-cols-3">
+          <DataTable
+            className="xl:col-span-2"
+            title="Department Semester Fee Records"
+            icon={Wallet}
+            rows={feeRows}
+            columns={[
+              ["departmentId", "Department"],
+              ["studentName", "Student"],
+              ["semesterName", "Semester"],
+              ["totalAmount", "Total", currency],
+              ["paidAmount", "Paid", currency],
+              ["status", "Status", (value) => <StatusPill status={value} />]
+            ]}
+          />
+          {canManageFees && (
+            <FormPanel title="Add Semester Fee By Department" icon={Plus} onSubmit={(payload) => createFee.mutate(payload)}>
+              {access.isDepartmentStaff && <input type="hidden" name="departmentId" value={access.departmentId} />}
+              <Field label="Department">
+                <Select
+                  name="departmentId"
+                  required={!access.isDepartmentStaff}
+                  defaultValue={access.departmentId || filters.departmentId}
+                  disabled={access.isDepartmentStaff}
+                >
+                  <option value="">{departments.isLoading ? "Loading departments..." : "Select department"}</option>
+                  {access.isDepartmentStaff && access.departmentId && <option value={access.departmentId}>{access.departmentId}</option>}
+                  {departmentOptions.map((department) => (
+                    <option key={department._id || department.name} value={department.name}>
+                      {department.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Semester"><Input name="semesterName" required defaultValue="Semester 1" /></Field>
+              <Field label="Academic Year"><Input name="academicYear" required defaultValue="2026/2027" /></Field>
+              <Field label="Student Group">
+                <Select name="academicStage" defaultValue="">
+                  <option value="">All part-time students</option>
+                  <option value="First year Part Time">First year Part Time</option>
+                  <option value="Second year Part Time">Second year Part Time</option>
+                </Select>
+              </Field>
+              <Field label="Category">
+                <Select name="category" defaultValue={categories.data?.data?.[0]?._id || ""}>
+                  <option value="">Select category</option>
+                  {(categories.data?.data || []).map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}
+                </Select>
+              </Field>
+              <Field label="Amount"><Input name="totalAmount" type="number" min="0" required /></Field>
+              <Field label="Due Date"><Input name="dueDate" type="date" defaultValue={today} required /></Field>
+              <Field label="Description"><Input name="description" defaultValue="Department semester part-time fee" /></Field>
+            </FormPanel>
+          )}
+        </div>
+      )}
+
+      {tab === "structures" && (
+        <div className="grid gap-5 xl:grid-cols-3">
+          <DataTable
+            className="xl:col-span-2"
+            title="Department / Semester Fee Structures"
+            icon={FileText}
+            rows={structures.data?.data || []}
+            columns={[
+              ["name", "Name"],
+              ["departmentId", "Department"],
+              ["semesterName", "Semester"],
+              ["academicYear", "Year"],
+              ["amount", "Amount", currency]
+            ]}
+          />
+          {canManageFees && (
+            <FormPanel title="Create Structure" icon={Plus} onSubmit={(payload) => createStructure.mutate(payload)}>
+              <Field label="Name"><Input name="name" required defaultValue="Part-Time Course Fee" /></Field>
+              {access.isDepartmentStaff && <input type="hidden" name="departmentId" value={access.departmentId} />}
+              <Field label="Department">
+                <Select name="departmentId" required={!access.isDepartmentStaff} defaultValue={access.departmentId || filters.departmentId} disabled={access.isDepartmentStaff}>
+                  <option value="">{departments.isLoading ? "Loading departments..." : "Select department"}</option>
+                  {access.isDepartmentStaff && access.departmentId && <option value={access.departmentId}>{access.departmentId}</option>}
+                  {departmentOptions.map((department) => (
+                    <option key={department._id || department.name} value={department.name}>
+                      {department.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Category">
+                <Select name="category" required defaultValue={categories.data?.data?.[0]?._id || ""}>
+                  <option value="">Select category</option>
+                  {(categories.data?.data || []).map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}
+                </Select>
+              </Field>
+              <Field label="Semester"><Input name="semesterName" required defaultValue="Semester 1" /></Field>
+              <Field label="Academic Year"><Input name="academicYear" required defaultValue="2026/2027" /></Field>
+              <Field label="Amount"><Input name="amount" type="number" required /></Field>
+              <Field label="Late Fee"><Input name="lateFeeValue" type="number" defaultValue="0" /></Field>
+            </FormPanel>
+          )}
+        </div>
+      )}
+
+      {tab === "payments" && (
+        <div className="grid gap-5 xl:grid-cols-3">
+          <DataTable
+            className="xl:col-span-2"
+            title="Payment Transaction Logs"
+            icon={CreditCard}
+            rows={payments.data?.data || []}
+            columns={[
+              ["paymentNumber", "Payment No."],
+              ["studentName", "Student"],
+              ["amount", "Amount", currency],
+              ["method", "Method"],
+              ["status", "Status", (value) => <StatusPill status={value} />]
+            ]}
+          />
+          {canManageMoney && (
+            <FormPanel title="Record Payment" icon={Banknote} onSubmit={(payload) => recordPayment.mutate(payload)}>
+              <Field label="Fee Record">
+                <Select name="feeRecord" required defaultValue={firstFee?._id || ""}>
+                  <option value="">Select fee record</option>
+                  {feeRows.filter((fee) => fee.status !== "paid").map((fee) => <option key={fee._id} value={fee._id}>{fee.studentId} - {fee.semesterName} - {currency(fee.totalAmount - fee.paidAmount)}</option>)}
+                </Select>
+              </Field>
+              <Field label="Amount"><Input name="amount" type="number" min="1" required /></Field>
+              <Field label="Method">
+                <Select name="method" required defaultValue="Cash">
+                  <option>Cash</option>
+                  <option>Card</option>
+                  <option>Credit/Debit Card</option>
+                  <option>Bank Transfer</option>
+                  <option>Internet Banking</option>
+                  <option>Mobile Wallet</option>
+                  <option>UPI/QR Payment</option>
+                  <option>Online Payment</option>
+                  <option>PayHere</option>
+                  <option>Stripe</option>
+                  <option>PayPal</option>
+                </Select>
+              </Field>
+              <Field label="Reference"><Input name="transactionReference" placeholder="Bank slip or transaction ID" /></Field>
+            </FormPanel>
+          )}
+        </div>
+      )}
+
+      {tab === "invoices" && (
+        <div className="grid gap-5 xl:grid-cols-3">
+          <DataTable
+            className="xl:col-span-2"
+            title="Invoices"
+            icon={FileText}
+            rows={invoices.data?.data || []}
+            columns={[
+              ["invoiceNumber", "Invoice No."],
+              ["studentName", "Student"],
+              ["totalAmount", "Total", currency],
+              ["dueDate", "Due", (value) => String(value || "").slice(0, 10)],
+              ["status", "Status", (value) => <StatusPill status={value} />],
+              ["_id", "PDF", (value, row) => <button className="text-sm font-bold text-[color:var(--md-primary)]" onClick={() => downloadFeeFile(`/invoices/${value}/download`, `${row.invoiceNumber}.pdf`)}>Download</button>]
+            ]}
+          />
+          {canManageFees && (
+            <FormPanel title="Generate Invoice" icon={Plus} onSubmit={(payload) => generateInvoice.mutate(payload)}>
+              <Field label="Fee Record">
+                <Select name="feeRecord" required defaultValue={firstFee?._id || ""}>
+                  <option value="">Select fee record</option>
+                  {feeRows.map((fee) => <option key={fee._id} value={fee._id}>{fee.studentId} - {fee.semesterName}</option>)}
+                </Select>
+              </Field>
+              <Field label="Due Date"><Input name="dueDate" type="date" defaultValue={today} /></Field>
+            </FormPanel>
+          )}
+        </div>
+      )}
+
+      {tab === "outstanding" && (
+        <DataTable
+          title="Outstanding Balances and Overdue Tracking"
+          icon={AlertTriangle}
+          rows={outstanding.data?.data || []}
+          columns={[
+            ["studentName", "Student"],
+            ["departmentId", "Department"],
+            ["dueDate", "Due", (value) => String(value || "").slice(0, 10)],
+            ["totalAmount", "Total", currency],
+            ["paidAmount", "Paid", currency],
+            ["status", "Status", (value) => <StatusPill status={value} />]
+          ]}
+        />
+      )}
+
+      {tab === "receipts" && (
+        <DataTable
+          title="Receipts and Reprint History"
+          icon={Receipt}
+          rows={receipts.data?.data || []}
+          columns={[
+            ["receiptNumber", "Receipt No."],
+            ["studentName", "Student"],
+            ["amount", "Amount", currency],
+            ["issuedAt", "Issued", (value) => String(value || "").slice(0, 10)],
+            ["_id", "PDF", (value, row) => <button className="text-sm font-bold text-[color:var(--md-primary)]" onClick={() => downloadFeeFile(`/receipts/${value}/download`, `${row.receiptNumber}.pdf`)}>Download</button>]
+          ]}
+        />
+      )}
+
+      {tab === "refunds" && (
+        <div className="grid gap-5 xl:grid-cols-3">
+          <DataTable
+            className="xl:col-span-2"
+            title="Refund Workflow"
+            icon={RefreshCw}
+            rows={refunds.data?.data || []}
+            columns={[
+              ["refundNumber", "Refund No."],
+              ["studentName", "Student"],
+              ["amount", "Amount", currency],
+              ["status", "Status", (value) => <StatusPill status={value} />],
+              ["_id", "Action", (value, row) => canManageMoney && row.status === "requested" ? (
+                <div className="flex gap-2">
+                  <button className="text-xs font-bold text-emerald-600" onClick={() => reviewRefund.mutate({ id: value, action: "approved" })}>Approve</button>
+                  <button className="text-xs font-bold text-rose-600" onClick={() => reviewRefund.mutate({ id: value, action: "rejected" })}>Reject</button>
+                </div>
+              ) : null]
+            ]}
+          />
+          <FormPanel title="Submit Refund Request" icon={Plus} onSubmit={(payload) => submitRefund.mutate(payload)}>
+            <Field label="Payment">
+              <Select name="payment" required defaultValue={firstPayment?._id || ""}>
+                <option value="">Select payment</option>
+                {(payments.data?.data || []).map((payment) => <option key={payment._id} value={payment._id}>{payment.paymentNumber} - {currency(payment.amount)}</option>)}
+              </Select>
+            </Field>
+            <Field label="Amount"><Input name="amount" type="number" min="1" required /></Field>
+            <Field label="Reason"><Input name="reason" required placeholder="Duplicate payment, withdrawal, adjustment..." /></Field>
+          </FormPanel>
+        </div>
+      )}
+
+      {tab === "notifications" && (
+        <div className="grid gap-5 xl:grid-cols-3">
+          <DataTable
+            className="xl:col-span-2"
+            title="Fee Notifications"
+            icon={Bell}
+            rows={notifications.data?.data || []}
+            columns={[
+              ["type", "Type"],
+              ["channel", "Channel"],
+              ["title", "Title"],
+              ["status", "Status", (value) => <StatusPill status={value} />]
+            ]}
+          />
+          {canManageFees && (
+            <FormPanel title="Queue Notification" icon={Bell} onSubmit={(payload) => notify.mutate(payload)}>
+              <Field label="Department"><Input name="departmentId" defaultValue={access.departmentId} disabled={access.isDepartmentStaff} /></Field>
+              <Field label="Type">
+                <Select name="type" defaultValue="fee_due_reminder">
+                  <option value="fee_due_reminder">Fee due reminder</option>
+                  <option value="payment_confirmation">Payment confirmation</option>
+                  <option value="refund_notification">Refund notification</option>
+                  <option value="overdue_alert">Overdue alert</option>
+                </Select>
+              </Field>
+              <Field label="Channel">
+                <Select name="channel" defaultValue="in_app">
+                  <option value="in_app">In app</option>
+                  <option value="email">Email</option>
+                  <option value="sms">SMS</option>
+                </Select>
+              </Field>
+              <Field label="Title"><Input name="title" required defaultValue="Fee reminder" /></Field>
+              <Field label="Message"><Input name="message" required defaultValue="Please settle your outstanding part-time programme fees." /></Field>
+            </FormPanel>
+          )}
+        </div>
+      )}
+
+      {tab === "requests" && (
+        <DataTable
+          title="Student Fee Requests"
+          icon={FileText}
+          rows={serviceRequests.data?.data || []}
+          columns={[
+            ["requestNumber", "Request No."],
+            ["studentName", "Student"],
+            ["type", "Type"],
+            ["title", "Title"],
+            ["status", "Status", (value) => <StatusPill status={value} />],
+            ["_id", "Action", (value, row) => canManageMoney && ["requested"].includes(row.status) ? (
+              <div className="flex gap-2">
+                <button className="text-xs font-bold text-emerald-600" onClick={() => reviewServiceRequest.mutate({ id: value, status: "approved" })}>Approve</button>
+                <button className="text-xs font-bold text-rose-600" onClick={() => reviewServiceRequest.mutate({ id: value, status: "rejected" })}>Reject</button>
+              </div>
+            ) : null]
+          ]}
+        />
+      )}
+
+      {tab === "reports" && (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {[
+            ["daily-collection", "Daily Collection Report"],
+            ["monthly-collection", "Monthly Collection Report"],
+            ["semester-collection", "Semester Collection Report"],
+            ["department-revenue", "Department Revenue Report"],
+            ["outstanding-fee", "Outstanding Fee Report"],
+            ["student-payment-history", "Student Payment History Report"],
+            ["refund", "Refund Report"]
+          ].map(([type, label]) => (
+            <div key={type} className="rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-4">
+              <FileText size={20} className="text-[color:var(--md-primary)]" />
+              <h3 className="mt-3 text-sm font-black text-[color:var(--md-text-primary)]">{label}</h3>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <SecondaryButton onClick={() => feesApi.report(type, { ...queryParams }).then((data) => downloadCsv(`${type}.csv`, data.rows || []))}>CSV</SecondaryButton>
+                <SecondaryButton onClick={() => downloadFeeFile(`/reports/${type}?format=pdf`, `${type}.pdf`)}>PDF</SecondaryButton>
+              </div>
             </div>
-          </motion.div>
-        )}
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 
-        {/* Header */}
-        <motion.div
-          className="mb-6 flex flex-col gap-4 border-b border-[color:var(--md-border)] pb-5 sm:flex-row sm:items-end sm:justify-between"
-          variants={stagger}
-          initial="hidden"
-          animate="visible"
-        >
-          <motion.div variants={fadeUp}>
-            <p className="portal-page-label">Student</p>
-            <h1 className="mt-2 text-2xl font-black text-[color:var(--md-text-primary)] sm:text-3xl">
-              Fee Management
-            </h1>
-            <p className="mt-1 text-sm text-[color:var(--md-text-secondary)]">
-              Track your payments, view installments, and manage fees
+function FormPanel({ title, icon: Icon, children, onSubmit }) {
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const payload = Object.fromEntries(formData.entries());
+    onSubmit(payload);
+    event.currentTarget.reset();
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-4">
+      <div className="mb-2 flex items-center gap-2">
+        <Icon size={18} className="text-[color:var(--md-primary)]" />
+        <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">{title}</h2>
+      </div>
+      {children}
+      <PrimaryButton type="submit" className="w-full"><Plus size={16} /> Save</PrimaryButton>
+    </form>
+  );
+}
+
+function DataTable({ title, icon: Icon, rows, columns, className = "" }) {
+  return (
+    <div className={`overflow-hidden rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] ${className}`}>
+      <div className="flex items-center gap-2 border-b border-[color:var(--md-border)] px-4 py-3">
+        <Icon size={18} className="text-[color:var(--md-primary)]" />
+        <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">{title}</h2>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-[color:var(--md-border)]">
+              {columns.map(([, label]) => (
+                <th key={label} className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-[color:var(--md-text-secondary)]">{label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length ? rows.map((row) => (
+              <tr key={row._id || row.id || JSON.stringify(row)} className="border-b border-[color:var(--md-border)] last:border-0 hover:bg-[color:var(--md-hover)]">
+                {columns.map(([key, , render]) => (
+                  <td key={key} className="whitespace-nowrap px-4 py-3 text-[color:var(--md-text-primary)]">
+                    {render ? render(row[key], row) : row[key] || "-"}
+                  </td>
+                ))}
+              </tr>
+            )) : (
+              <tr>
+                <td colSpan={columns.length} className="px-4 py-8 text-center text-sm text-[color:var(--md-text-secondary)]">No records found.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function StudentFeesPortal({ dashboard, feeRows, payments, invoices, receipts, refunds, notifications, serviceRequests, recordPayment, createServiceRequest, message, setMessage, refreshAll }) {
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("Credit/Debit Card");
+  const [paymentPortal, setPaymentPortal] = useState(null);
+  const [paymentForm, setPaymentForm] = useState({
+    method: "Credit/Debit Card",
+    amount: "",
+    cardNumber: "",
+    cardHolder: "",
+    expiry: "",
+    cvv: "",
+    bankName: "",
+    bankReference: "",
+    walletNumber: "",
+    upiId: "",
+    gatewayEmail: "",
+    reference: ""
+  });
+  const widgets = dashboard.data?.widgets || {};
+  const totalFees = feeRows.reduce((sum, fee) => sum + Number(fee.totalAmount || 0) + Number(fee.lateFeeAmount || 0), 0);
+  const totalPaid = feeRows.reduce((sum, fee) => sum + Number(fee.paidAmount || 0), 0);
+  const totalDue = Math.max(0, totalFees - totalPaid - feeRows.reduce((sum, fee) => sum + Number(fee.discountAmount || 0), 0));
+  const progress = totalFees > 0 ? Math.min(100, Math.round((totalPaid / totalFees) * 100)) : 0;
+  const overdueFees = feeRows.filter((fee) => fee.status === "overdue" || (fee.dueDate && new Date(fee.dueDate) < new Date() && fee.status !== "paid"));
+  const upcomingFees = feeRows
+    .filter((fee) => fee.status !== "paid" && fee.dueDate && new Date(fee.dueDate) >= new Date())
+    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+  const nextPaymentDate = upcomingFees[0]?.dueDate ? String(upcomingFees[0].dueDate).slice(0, 10) : "No scheduled due date";
+  const semesterSummary = Object.values(feeRows.reduce((acc, fee) => {
+    const key = `${fee.semesterName || "Semester"} ${fee.academicYear || ""}`.trim();
+    acc[key] ||= { semester: key, total: 0, paid: 0, due: 0 };
+    const due = Math.max(0, Number(fee.totalAmount || 0) + Number(fee.lateFeeAmount || 0) - Number(fee.discountAmount || 0) - Number(fee.paidAmount || 0));
+    acc[key].total += Number(fee.totalAmount || 0);
+    acc[key].paid += Number(fee.paidAmount || 0);
+    acc[key].due += due;
+    return acc;
+  }, {}));
+  const feeBreakdown = [
+    ["Registration Fee", "Registration"],
+    ["Course Fee", "Course"],
+    ["Exam Fee", "Exam"],
+    ["Library Fee", "Library"],
+    ["Hostel Fee", "Hostel"],
+    ["Certificate Fee", "Certificate"],
+    ["Fine/Penalty Charges", "Fine"],
+    ["Other Charges", "Other"]
+  ].map(([label, match]) => ({
+    label,
+    amount: feeRows
+      .filter((fee) => `${fee.description || ""} ${fee.category?.name || ""}`.toLowerCase().includes(match.toLowerCase()))
+      .reduce((sum, fee) => sum + Number(fee.totalAmount || 0), 0)
+  }));
+  const paymentMethods = ["Credit/Debit Card", "Bank Transfer", "Internet Banking", "Mobile Wallet", "UPI/QR Payment", "PayHere", "Stripe", "PayPal"];
+  const feeOutstanding = (fee) => Math.max(0, Number(fee.totalAmount || 0) + Number(fee.lateFeeAmount || 0) - Number(fee.discountAmount || 0) - Number(fee.paidAmount || 0));
+  const clearanceItems = [
+    ["No Due Certificate", totalDue <= 0 ? "eligible" : "pending"],
+    ["Department Clearance", totalDue <= 0 ? "cleared" : "pending"],
+    ["Graduation Clearance", totalDue <= 0 ? "cleared" : "pending"],
+    ["Exam Eligibility", overdueFees.length ? "blocked" : "eligible"]
+  ];
+
+  const openPaymentPortal = (fee) => {
+    const outstanding = feeOutstanding(fee);
+    if (outstanding <= 0) {
+      setMessage("This fee is already fully paid.");
+      return;
+    }
+
+    setPaymentPortal({ fee, outstanding });
+    setPaymentForm((current) => ({
+      ...current,
+      method: selectedPaymentMethod,
+      amount: String(outstanding),
+      reference: `STUDENT-${Date.now()}`
+    }));
+  };
+
+  const submitDummyPayment = (event) => {
+    event.preventDefault();
+    if (!paymentPortal?.fee) return;
+
+    const amount = Number(paymentForm.amount);
+    if (!amount || amount <= 0) {
+      setMessage("Enter a valid payment amount.");
+      return;
+    }
+    if (amount > paymentPortal.outstanding) {
+      setMessage("Payment amount cannot be higher than the current balance.");
+      return;
+    }
+    if (paymentForm.method === "Credit/Debit Card" && (!paymentForm.cardNumber || !paymentForm.cardHolder || !paymentForm.expiry || !paymentForm.cvv)) {
+      setMessage("Enter the dummy card details to continue.");
+      return;
+    }
+
+    const transactionReference = (paymentForm.reference || paymentForm.bankReference || paymentForm.upiId || paymentForm.gatewayEmail || "").trim() || `STUDENT-${Date.now()}`;
+    recordPayment.mutate({
+      feeRecord: paymentPortal.fee._id,
+      amount,
+      method: paymentForm.method,
+      transactionReference
+    }, {
+      onSuccess: () => setPaymentPortal(null)
+    });
+  };
+
+  const paymentFieldValue = (field) => paymentForm[field] || "";
+  const updatePaymentField = (field, value) => setPaymentForm((current) => ({ ...current, [field]: value }));
+  const gatewayMethods = ["PayHere", "Stripe", "PayPal"];
+  const selfServiceRequestTypes = {
+    "Upload bank deposit slip": "bank_slip_upload",
+    "Request installment plan": "installment_plan",
+    "Request fee extension": "fee_extension",
+    "Download statement": "statement_download",
+    "View fee policies": "fee_policy",
+    "Request No Due Certificate": "no_due_certificate",
+    "Request fee waiver": "fee_waiver",
+    "Request scholarship review": "scholarship"
+  };
+  const selfService = (action) => {
+    createServiceRequest.mutate({
+      type: selfServiceRequestTypes[action] || "fee_policy",
+      title: action,
+      feeRecord: feeRows.find((fee) => fee.status !== "paid")?._id,
+      amount: totalDue,
+      note: `${action} submitted from student fee dashboard.`
+    });
+  };
+
+  return (
+    <section className="space-y-6">
+      <div className="flex flex-col gap-4 border-b border-[color:var(--md-border)] pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="portal-page-label">Student Fees</p>
+          <h1 className="mt-2 text-2xl font-black text-[color:var(--md-text-primary)] sm:text-3xl">Fee Dashboard</h1>
+          <p className="mt-1 text-sm text-[color:var(--md-text-secondary)]">
+            View department-assigned semester fees, make payments, and download receipts.
+          </p>
+        </div>
+        <SecondaryButton onClick={refreshAll}><RefreshCw size={16} /> Refresh</SecondaryButton>
+      </div>
+
+      {message && (
+        <div className="flex items-center gap-2 rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] px-4 py-3 text-sm text-[color:var(--md-text-primary)]">
+          <ShieldCheck size={16} className="text-[color:var(--md-primary)]" />
+          {message}
+        </div>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Current Balance Due" value={currency(totalDue || widgets.totalOutstanding)} icon={Wallet} tone="text-rose-600" />
+        <MetricCard label="Total Fees Paid" value={currency(totalPaid || widgets.totalCollected)} icon={CheckCircle} tone="text-emerald-600" />
+        <MetricCard label="Upcoming Payments" value={nextPaymentDate} icon={Bell} tone="text-amber-600" />
+        <MetricCard label="Overdue Payments" value={overdueFees.length} icon={AlertTriangle} tone="text-rose-600" />
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-3">
+        <div className="rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-4 xl:col-span-2">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">Payment Progress</h2>
+              <p className="mt-1 text-xs text-[color:var(--md-text-secondary)]">Remaining balance updates after each confirmed payment.</p>
+            </div>
+            <span className="text-2xl font-black text-[color:var(--md-primary)]">{progress}%</span>
+          </div>
+          <div className="mt-4 h-3 overflow-hidden rounded-full bg-[color:var(--md-hover)]">
+            <div className="h-full rounded-full bg-[color:var(--md-primary)]" style={{ width: `${progress}%` }} />
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <span className="rounded-lg bg-[color:var(--md-hover)] px-3 py-2 text-sm">Total {currency(totalFees)}</span>
+            <span className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-600">Paid {currency(totalPaid)}</span>
+            <span className="rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-600">Due {currency(totalDue)}</span>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-4">
+          <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">Payment Method</h2>
+          <Select className="mt-3" value={selectedPaymentMethod} onChange={(event) => setSelectedPaymentMethod(event.target.value)}>
+            {paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}
+          </Select>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[color:var(--md-text-secondary)]">
+            {paymentMethods.slice(0, 6).map((method) => <span key={method} className="rounded-lg border border-[color:var(--md-border)] px-2 py-2">{method}</span>)}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-3">
+        <div className="space-y-4 xl:col-span-2">
+          <DataTable
+            title="Semester-Wise Fee Summary"
+            icon={FileText}
+            rows={semesterSummary}
+            columns={[
+              ["semester", "Semester"],
+              ["total", "Total", currency],
+              ["paid", "Paid", currency],
+              ["due", "Remaining", currency]
+            ]}
+          />
+
+          <div className="overflow-hidden rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)]">
+            <div className="flex items-center gap-2 border-b border-[color:var(--md-border)] px-4 py-3">
+              <Wallet size={18} className="text-[color:var(--md-primary)]" />
+              <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">Assigned Department Fees</h2>
+            </div>
+            <div className="divide-y divide-[color:var(--md-border)]">
+              {feeRows.length ? feeRows.map((fee) => {
+                const outstanding = feeOutstanding(fee);
+                return (
+                  <div key={fee._id} className="grid gap-3 p-4 md:grid-cols-[1fr_auto] md:items-center">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-black text-[color:var(--md-text-primary)]">{fee.semesterName} - {fee.academicYear}</h3>
+                        <StatusPill status={fee.status} />
+                      </div>
+                      <p className="mt-1 text-sm text-[color:var(--md-text-secondary)]">{fee.description || "Department semester fee"}</p>
+                      <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
+                        <span>Total: <strong>{currency(fee.totalAmount)}</strong></span>
+                        <span>Paid: <strong>{currency(fee.paidAmount)}</strong></span>
+                        <span>Due: <strong>{currency(outstanding)}</strong></span>
+                      </div>
+                      {Array.isArray(fee.installmentPlan) && fee.installmentPlan.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {fee.installmentPlan.map((item, index) => (
+                            <span key={`${fee._id}-${index}`} className="rounded-full bg-[color:var(--md-hover)] px-3 py-1 text-xs">
+                              {item.label || `Installment ${index + 1}`}: {currency(item.amount)} due {String(item.dueDate || "").slice(0, 10) || "TBA"}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <PrimaryButton disabled={recordPayment.isPending || outstanding <= 0} onClick={() => openPaymentPortal(fee)}>
+                      <CreditCard size={16} />
+                      {outstanding > 0 ? `Pay ${currency(outstanding)}` : "Paid"}
+                    </PrimaryButton>
+                  </div>
+                );
+              }) : (
+                <p className="px-4 py-8 text-center text-sm text-[color:var(--md-text-secondary)]">No fees assigned yet.</p>
+              )}
+            </div>
+          </div>
+
+          <DataTable
+            title="Payment History & Analytics"
+            icon={Banknote}
+            rows={payments.data?.data || []}
+            columns={[
+              ["paymentNumber", "Payment No."],
+              ["amount", "Amount", currency],
+              ["method", "Method"],
+              ["paymentDate", "Date", (value) => String(value || "").slice(0, 10)],
+              ["status", "Status", (value) => <StatusPill status={value} />]
+            ]}
+          />
+
+          <DataTable
+            title="Invoice History"
+            icon={FileText}
+            rows={invoices.data?.data || []}
+            columns={[
+              ["invoiceNumber", "Invoice No."],
+              ["totalAmount", "Amount", currency],
+              ["dueDate", "Due", (value) => String(value || "").slice(0, 10)],
+              ["status", "Status", (value) => <StatusPill status={value} />],
+              ["_id", "PDF", (value, row) => <button className="text-sm font-bold text-[color:var(--md-primary)]" onClick={() => downloadFeeFile(`/invoices/${value}/download`, `${row.invoiceNumber}.pdf`)}>Download</button>]
+            ]}
+          />
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-4">
+            <div className="flex items-center gap-2">
+              <Wallet size={18} className="text-[color:var(--md-primary)]" />
+              <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">Smart Fee Breakdown</h2>
+            </div>
+            <div className="mt-4 space-y-2">
+              {feeBreakdown.map((item) => (
+                <div key={item.label} className="flex items-center justify-between rounded-lg bg-[color:var(--md-hover)] px-3 py-2 text-sm">
+                  <span>{item.label}</span>
+                  <strong>{currency(item.amount)}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-4">
+            <div className="flex items-center gap-2">
+              <Receipt size={18} className="text-[color:var(--md-primary)]" />
+              <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">Receipt Center</h2>
+            </div>
+            <div className="mt-4 space-y-3">
+              {(receipts.data?.data || []).length ? receipts.data.data.map((receipt) => (
+                <div key={receipt._id} className="rounded-lg border border-[color:var(--md-border)] p-3">
+                  <p className="text-sm font-bold text-[color:var(--md-text-primary)]">{receipt.receiptNumber}</p>
+                  <p className="mt-1 text-xs text-[color:var(--md-text-secondary)]">{String(receipt.issuedAt || "").slice(0, 10)} - {currency(receipt.amount)}</p>
+                  <SecondaryButton className="mt-3 w-full" onClick={() => downloadFeeFile(`/receipts/${receipt._id}/download`, `${receipt.receiptNumber}.pdf`)}>
+                    <Download size={15} />
+                    Download
+                  </SecondaryButton>
+                  <SecondaryButton className="mt-2 w-full" onClick={() => window.print()}>
+                    Print Receipt
+                  </SecondaryButton>
+                </div>
+              )) : (
+                <p className="py-6 text-center text-sm text-[color:var(--md-text-secondary)]">Receipts will appear after payment.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-4">
+            <div className="flex items-center gap-2">
+              <Bell size={18} className="text-[color:var(--md-primary)]" />
+              <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">Smart Notifications</h2>
+            </div>
+            <div className="mt-4 space-y-2">
+              {(notifications.data?.data || []).slice(0, 4).map((notice) => (
+                <div key={notice._id} className="rounded-lg border border-[color:var(--md-border)] p-3">
+                  <p className="text-sm font-bold text-[color:var(--md-text-primary)]">{notice.title}</p>
+                  <p className="mt-1 text-xs text-[color:var(--md-text-secondary)]">{notice.message}</p>
+                </div>
+              ))}
+              {!(notifications.data?.data || []).length && ["Payment due reminders", "Overdue alerts", "Successful payment notifications", "Email/SMS/WhatsApp notifications"].map((item) => (
+                <p key={item} className="rounded-lg bg-[color:var(--md-hover)] px-3 py-2 text-sm text-[color:var(--md-text-secondary)]">{item}</p>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle size={18} className="text-[color:var(--md-primary)]" />
+              <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">Scholarships & Discounts</h2>
+            </div>
+            {["Scholarship tracking", "Merit discounts", "Financial aid records", "Fee waiver requests", "Discount approval status"].map((item) => (
+              <div key={item} className="mt-2 flex items-center justify-between rounded-lg bg-[color:var(--md-hover)] px-3 py-2 text-sm">
+                <span>{item}</span>
+                <StatusPill status="pending" />
+              </div>
+            ))}
+            <div className="mt-3 grid gap-2">
+              <SecondaryButton onClick={() => selfService("Request scholarship review")}>Request scholarship review</SecondaryButton>
+              <SecondaryButton onClick={() => selfService("Request fee waiver")}>Request fee waiver</SecondaryButton>
+            </div>
+          </div>
+
+          <DataTable
+            title="Refund Tracking"
+            icon={RefreshCw}
+            rows={refunds.data?.data || []}
+            columns={[
+              ["refundNumber", "Refund No."],
+              ["amount", "Amount", currency],
+              ["status", "Status", (value) => <StatusPill status={value} />]
+            ]}
+          />
+
+          <DataTable
+            title="Admin-Controlled Requests"
+            icon={FileText}
+            rows={serviceRequests.data?.data || []}
+            columns={[
+              ["requestNumber", "Request No."],
+              ["title", "Request"],
+              ["status", "Status", (value) => <StatusPill status={value} />]
+            ]}
+          />
+
+          <div className="rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-4">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={18} className="text-[color:var(--md-primary)]" />
+              <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">Fee Clearance</h2>
+            </div>
+            <div className="mt-4 space-y-2">
+              {clearanceItems.map(([label, status]) => (
+                <div key={label} className="flex items-center justify-between rounded-lg bg-[color:var(--md-hover)] px-3 py-2 text-sm">
+                  <span>{label}</span>
+                  <StatusPill status={status} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-4">
+            <div className="flex items-center gap-2">
+              <FileText size={18} className="text-[color:var(--md-primary)]" />
+              <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">Self-Service</h2>
+            </div>
+            <div className="mt-4 grid gap-2">
+              {["Upload bank deposit slip", "Request installment plan", "Request fee extension", "Download statement", "View fee policies", "Request No Due Certificate"].map((action) => (
+                <SecondaryButton key={action} disabled={createServiceRequest.isPending} onClick={() => selfService(action)}>{action}</SecondaryButton>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-4">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={18} className="text-[color:var(--md-primary)]" />
+              <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">Access</h2>
+            </div>
+            <p className="mt-3 text-sm text-[color:var(--md-text-secondary)]">
+              OTP verification, secure payment gateway routing, transaction audit logs, fraud checks, and role-based access control protect student fee payments.
             </p>
-          </motion.div>
+          </div>
+        </div>
+      </div>
 
-          <motion.div variants={fadeUp} className="flex items-center gap-3">
-            <div className="flex items-center gap-2 rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] px-5 py-3">
-              <Bell size={16} className="text-[color:var(--md-primary)]" />
-              <span className="text-xs font-semibold text-[color:var(--md-text-secondary)]">Reminders</span>
-              <button
-                onClick={() => setReminderEnabled((p) => !p)}
-                className={`relative h-5 w-9 rounded-full transition-all duration-300 ${
-                  reminderEnabled ? "bg-emerald-500" : "bg-[color:var(--md-hover)]"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all duration-300 ${
-                    reminderEnabled ? "left-4" : "left-0.5"
-                  }`}
-                />
+      {paymentPortal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <form onSubmit={submitDummyPayment} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-[color:var(--md-border)] pb-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-[color:var(--md-text-secondary)]">Dummy Payment Portal</p>
+                <h2 className="mt-1 text-xl font-black text-[color:var(--md-text-primary)]">{paymentPortal.fee.semesterName} Payment</h2>
+                <p className="mt-1 text-sm text-[color:var(--md-text-secondary)]">Choose a payment method and confirm the test transaction.</p>
+              </div>
+              <button type="button" className="rounded-lg border border-[color:var(--md-border)] px-3 py-1 text-lg font-black text-[color:var(--md-text-primary)]" onClick={() => setPaymentPortal(null)}>
+                x
               </button>
             </div>
-          </motion.div>
-        </motion.div>
 
-        {/* Progress Ring + Quick Stats */}
-        <div className="mb-8 grid gap-6 lg:grid-cols-5">
-          <motion.div
-            variants={fadeUp}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            className="lg:col-span-2 flex items-center justify-center"
-          >
-            <GlassCard className="p-6 w-full">
-              <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-around">
-                <div className="relative flex items-center justify-center">
-                  <svg width="160" height="160" className="-rotate-90">
-                    <circle
-                      cx="80" cy="80" r={RADIUS}
-                      fill="none"
-                      stroke="var(--md-border)"
-                      strokeWidth="12"
-                    />
-                    <circle
-                      cx="80" cy="80" r={RADIUS}
-                      fill="none"
-                      stroke="var(--color-mint)"
-                      strokeWidth="12"
-                      strokeLinecap="round"
-                      strokeDasharray={CIRCUMFERENCE}
-                      strokeDashoffset={CIRCUMFERENCE * (1 - paidPercent / 100)}
-                      style={{ transition: "stroke-dashoffset 1.2s ease" }}
-                    />
-                  </svg>
-                  <div className="absolute flex flex-col items-center">
-                    <span className="text-3xl font-black tracking-tight" style={{ color: "var(--color-mint)" }}>
-                      {paidPercent}%
-                    </span>
-                    <span className="text-xs font-semibold text-[color:var(--md-text-secondary)]">Paid</span>
-                  </div>
-                </div>
-                <div className="text-center sm:text-left">
-                  <p className="text-sm font-semibold text-[color:var(--md-text-secondary)]">Total Balance</p>
-                  <p className="text-3xl font-black text-[color:var(--md-text-primary)]">
-                    LKR {feeData.totalFee.toLocaleString()}
-                  </p>
-                  <div className="mt-2 flex items-center gap-4">
-                    <div className="flex items-center gap-1.5">
-                      <TrendingUp size={14} style={{ color: "var(--color-mint)" }} />
-                      <span className="text-xs font-bold" style={{ color: "var(--color-mint)" }}>
-                        LKR {feeData.paid.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <TrendingDown size={14} style={{ color: "#ef4444" }} />
-                      <span className="text-xs font-bold" style={{ color: "#ef4444" }}>
-                        LKR {feeData.due.toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </GlassCard>
-          </motion.div>
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <Field label="Payment Method">
+                <Select value={paymentForm.method} onChange={(event) => {
+                  updatePaymentField("method", event.target.value);
+                  setSelectedPaymentMethod(event.target.value);
+                }}>
+                  {paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}
+                </Select>
+              </Field>
+              <Field label={`Amount due ${currency(paymentPortal.outstanding)}`}>
+                <Input type="number" min="1" max={paymentPortal.outstanding} value={paymentFieldValue("amount")} onChange={(event) => updatePaymentField("amount", event.target.value)} />
+              </Field>
 
-          <motion.div
-            variants={stagger}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-40px" }}
-            className="lg:col-span-3 grid gap-4 grid-cols-2"
-          >
-            {[
-              { label: "Total Fee", value: `LKR ${feeData.totalFee.toLocaleString()}`, color: "var(--md-text-primary)", icon: Wallet },
-              { label: "Paid", value: `LKR ${feeData.paid.toLocaleString()}`, color: "var(--color-mint)", icon: CheckCircle },
-              { label: "Due", value: `LKR ${feeData.due.toLocaleString()}`, color: "#ef4444", icon: AlertTriangle },
-              { label: "Next Payment", value: nextPaymentDate, color: "#f59e0b", icon: Clock },
-            ].map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <motion.div key={stat.label} variants={fadeUp}>
-                  <GlassCard className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wider text-[color:var(--md-text-secondary)]">
-                          {stat.label}
-                        </p>
-                        <p className="mt-1 text-lg font-black" style={{ color: stat.color }}>
-                          {stat.value}
-                        </p>
-                      </div>
-                      <Icon size={22} style={{ color: stat.color, opacity: 0.5 }} />
-                    </div>
-                  </GlassCard>
-                </motion.div>
-              );
-            })}
-          </motion.div>
-        </div>
-
-        {/* Action Buttons */}
-        <motion.div
-          className="mb-8 flex flex-wrap gap-3"
-          variants={fadeUp}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-        >
-          <button
-            onClick={() => setShowPaymentModal(true)}
-            className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-all duration-200"
-            style={{
-              background: "linear-gradient(135deg, var(--color-ocean), #0754c9)",
-              color: "#fff",
-              boxShadow: "0 4px 18px rgba(13,110,253,0.35)",
-            }}
-          >
-            <CreditCard size={18} />
-            Pay Online
-          </button>
-          <button
-            onClick={handleDownload}
-            className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-all duration-200 border border-[color:var(--md-border)] text-[color:var(--md-text-primary)] hover:bg-[color:var(--md-hover)]"
-          >
-            <Download size={18} />
-            Download Receipts
-          </button>
-        </motion.div>
-
-        {/* Payment History + Breakdown */}
-        <div className="mb-8 grid gap-6 lg:grid-cols-5">
-          <motion.div
-            variants={fadeUp}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-40px" }}
-            className="lg:col-span-3"
-          >
-            <GlassCard className="overflow-x-auto p-0">
-              <div className="flex items-center gap-3 px-5 py-4 border-b border-[color:var(--md-border)]">
-                <Receipt size={18} className="text-[color:var(--md-primary)]" />
-                <h3 className="text-base font-black text-[color:var(--md-text-primary)]">Payment History</h3>
-              </div>
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[color:var(--md-border)]">
-                    {["Date", "Description", "Amount", "Status", "Method"].map((h) => (
-                      <th key={h} className="px-5 py-3 text-xs font-bold uppercase tracking-wider text-[color:var(--md-text-secondary)]"
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {feeData.paymentHistory.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="transition-colors border-b border-[color:var(--md-border)]"
-                      onMouseEnter={(e) => e.currentTarget.style.background = "var(--md-hover)"}
-                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                    >
-                      <td className="px-5 py-3.5 font-medium text-[color:var(--md-text-secondary)]">{row.date}</td>
-                      <td className="px-5 py-3.5 text-[color:var(--md-text-secondary)]">{row.type}</td>
-                      <td className="px-5 py-3.5 font-semibold text-[color:var(--md-text-primary)]">
-                        LKR {row.amount.toLocaleString()}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span
-                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold"
-                          style={{
-                            background: row.status === "paid"
-                              ? "rgba(34,197,94,0.12)"
-                              : "rgba(245,158,11,0.12)",
-                            color: row.status === "paid" ? "var(--md-success)" : "var(--md-warning)",
-                          }}
-                        >
-                          {row.status === "paid" ? <CheckCircle size={12} /> : <Clock size={12} />}
-                          {row.status === "paid" ? "Paid" : "Pending"}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 text-xs text-[color:var(--md-text-secondary)]">
-                        {row.method || "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </GlassCard>
-          </motion.div>
-
-          <motion.div
-            variants={fadeUp}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-40px" }}
-            className="lg:col-span-2"
-          >
-            <GlassCard className="p-5">
-              <h3 className="mb-1 text-base font-black text-[color:var(--md-text-primary)]">
-                Fee Breakdown
-              </h3>
-              <p className="mb-4 text-xs text-[color:var(--md-text-secondary)]">
-                Category-wise fee distribution
-              </p>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={feeCategories}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {feeCategories.map((entry) => (
-                      <Cell key={entry.name} fill={entry.color} stroke="var(--md-border)" strokeWidth={1} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      background: "var(--md-card)",
-                      border: "1px solid var(--md-border)",
-                      borderRadius: 8,
-                      color: "var(--md-text-primary)",
-                      fontSize: 12,
-                    }}
-                    formatter={(value) => [`LKR ${value.toLocaleString()}`, "Amount"]}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="mt-2 space-y-2">
-                {feeCategories.map((cat) => (
-                  <div key={cat.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: cat.color }} />
-                      <span className="text-xs font-medium text-[color:var(--md-text-secondary)]">{cat.name}</span>
-                    </div>
-                    <span className="text-xs font-semibold text-[color:var(--md-text-primary)]">
-                      LKR {cat.value.toLocaleString()}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </GlassCard>
-          </motion.div>
-        </div>
-
-        {/* Installment Plan + Scholarships */}
-        <div className="mb-8 grid gap-6 lg:grid-cols-5">
-          <motion.div
-            variants={fadeUp}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-40px" }}
-            className="lg:col-span-3"
-          >
-            <GlassCard className="p-5">
-              <div className="mb-4 flex items-center gap-3">
-                <Wallet size={18} className="text-[color:var(--md-primary)]" />
-                <h3 className="text-base font-black text-[color:var(--md-text-primary)]">Installment Plan</h3>
-              </div>
-              <div className="space-y-0 divide-y divide-[color:var(--md-border)]">
-                {installments.map((inst, i) => {
-                  const statusStyle = inst.status === "paid"
-                    ? { bg: "rgba(34,197,94,0.12)", color: "var(--md-success)", icon: CheckCircle }
-                    : inst.status === "pending"
-                    ? { bg: "rgba(245,158,11,0.12)", color: "var(--md-warning)", icon: Clock }
-                    : { bg: "var(--md-hover)", color: "var(--md-text-secondary)", icon: Clock };
-                  const StatusIcon = statusStyle.icon;
-                  return (
-                    <div key={i} className="flex items-center gap-4 py-3">
-                      <div
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-                        style={{ background: statusStyle.bg }}
-                      >
-                        <StatusIcon size={16} style={{ color: statusStyle.color }} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-[color:var(--md-text-primary)]">{inst.month}</p>
-                        <p className="text-xs text-[color:var(--md-text-secondary)]">
-                          Due: {inst.dueDate}{inst.paidDate ? ` · Paid: ${inst.paidDate}` : ""}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-[color:var(--md-text-primary)]">
-                          LKR {inst.amount.toLocaleString()}
-                        </p>
-                        <span
-                          className="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold capitalize"
-                          style={{
-                            background: statusStyle.bg,
-                            color: statusStyle.color,
-                          }}
-                        >
-                          {inst.status}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </GlassCard>
-          </motion.div>
-
-          <motion.div
-            variants={fadeUp}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-40px" }}
-            className="lg:col-span-2 space-y-6"
-          >
-            <GlassCard className="p-5">
-              <div className="mb-4 flex items-center gap-3">
-                <Award size={18} style={{ color: "#f59e0b" }} />
-                <h3 className="text-base font-black text-[color:var(--md-text-primary)]">Scholarships</h3>
-              </div>
-              {feeData.scholarships.length === 0 ? (
-                <p className="py-6 text-center text-sm text-[color:var(--md-text-secondary)]">
-                  No scholarships awarded
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {feeData.scholarships.map((s, i) => (
-                    <div
-                      key={i}
-                      className="rounded-xl p-4"
-                      style={{
-                        background: "rgba(245,158,11,0.06)",
-                        border: "1px solid rgba(245,158,11,0.15)",
-                      }}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-bold" style={{ color: "#fbbf24" }}>{s.name}</p>
-                        <span
-                          className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
-                          style={{
-                            background: "rgba(34,197,94,0.15)",
-                            color: "var(--md-success)",
-                          }}
-                        >
-                          {s.status}
-                        </span>
-                      </div>
-                      <p className="text-xs text-[color:var(--md-text-secondary)]">{s.provider}</p>
-                      <p className="mt-1 text-lg font-black" style={{ color: "#fbbf24" }}>
-                        LKR {s.amount.toLocaleString()}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </GlassCard>
-
-            <GlassCard className="p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <TrendingUp size={18} className="text-[color:var(--md-primary)]" />
-                <h3 className="text-base font-black text-[color:var(--md-text-primary)]">Payment Summary</h3>
-              </div>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-[color:var(--md-text-secondary)]">Total Fee</span>
-                  <span className="text-sm font-bold text-[color:var(--md-text-primary)]">
-                    LKR {feeData.totalFee.toLocaleString()}
-                  </span>
-                </div>
-                <div className="h-px w-full" style={{ background: "var(--md-border)" }} />
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-[color:var(--md-text-secondary)]">Total Paid</span>
-                  <span className="text-sm font-bold" style={{ color: "var(--color-mint)" }}>
-                    LKR {feeData.paid.toLocaleString()}
-                  </span>
-                </div>
-                <div className="h-px w-full" style={{ background: "var(--md-border)" }} />
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-[color:var(--md-text-secondary)]">Remaining Due</span>
-                  <span className="text-sm font-bold" style={{ color: "#ef4444" }}>
-                    LKR {feeData.due.toLocaleString()}
-                  </span>
-                </div>
-                <div className="h-px w-full" style={{ background: "var(--md-border)" }} />
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-[color:var(--md-text-secondary)]">Scholarships</span>
-                  <span className="text-sm font-bold" style={{ color: "#fbbf24" }}>
-                    LKR {feeData.scholarships.reduce((s, c) => s + c.amount, 0).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            </GlassCard>
-          </motion.div>
-        </div>
-
-        {/* Payment Gateway Modal */}
-        {showPaymentModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
-            onClick={() => { if (!processing) setShowPaymentModal(false); }}
-          >
-            <motion.div
-              initial={{ scale: 0.92, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="w-full max-w-md rounded-2xl p-6 shadow-2xl"
-              style={{
-                background: "var(--md-card)",
-                border: "1px solid var(--md-border)",
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[color:var(--md-primary)]/10">
-                    <CreditCard size={20} className="text-[color:var(--md-primary)]" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black text-[color:var(--md-text-primary)]">Payment Gateway</h3>
-                    <p className="text-xs text-[color:var(--md-text-secondary)]">Secure online payment</p>
-                  </div>
-                </div>
-                {!processing && (
-                  <button
-                    onClick={() => setShowPaymentModal(false)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-[color:var(--md-hover)] text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)] transition-colors"
-                  >
-                    &times;
-                  </button>
-                )}
-              </div>
-
-              {paymentSuccess ? (
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="flex flex-col items-center py-8"
-                >
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/20 mb-4">
-                    <CheckCircle size={40} className="text-[color:var(--md-success)]" />
-                  </div>
-                  <p className="text-xl font-black text-[color:var(--md-text-primary)]">Payment Successful!</p>
-                  <p className="mt-1 text-sm text-[color:var(--md-text-secondary)]">
-                    LKR {paymentAmount.toLocaleString()} has been processed
-                  </p>
-                </motion.div>
-              ) : (
+              {paymentForm.method === "Credit/Debit Card" && (
                 <>
-                  <div className="mb-5">
-                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-[color:var(--md-text-secondary)]">
-                      Amount
-                    </label>
-                    <div
-                      className="flex items-center gap-2 rounded-xl px-4 py-3"
-                      style={{
-                        background: "var(--md-hover)",
-                        border: "1px solid var(--md-border)",
-                      }}
-                    >
-                      <span className="text-sm font-bold text-[color:var(--md-text-secondary)]">LKR</span>
-                      <input
-                        type="number"
-                        value={paymentAmount}
-                        onChange={(e) => setPaymentAmount(Number(e.target.value))}
-                        disabled={processing}
-                        className="w-full bg-transparent text-lg font-black outline-none text-[color:var(--md-text-primary)]"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mb-6">
-                    <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[color:var(--md-text-secondary)]">
-                      Payment Method
-                    </label>
-                    <div className="space-y-2">
-                      {paymentMethods.map((pm) => {
-                        const Icon = pm.icon;
-                        return (
-                          <label
-                            key={pm.id}
-                            className={`flex cursor-pointer items-center gap-3 rounded-xl p-3 transition-all ${
-                              paymentMethod === pm.id
-                                ? "bg-[#0d6efd]/10 border border-[#0d6efd]/30"
-                                : "border border-[color:var(--md-border)] hover:bg-[color:var(--md-hover)]"
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="paymentMethod"
-                              value={pm.id}
-                              checked={paymentMethod === pm.id}
-                              onChange={() => setPaymentMethod(pm.id)}
-                              disabled={processing}
-                              className="appearance-none h-4 w-4 rounded-full border-2 border-[color:var(--md-text-secondary)] checked:border-[#0d6efd] checked:bg-[#0d6efd] transition-colors"
-                            />
-                            <Icon size={18} style={{ color: paymentMethod === pm.id ? "#0d6efd" : "var(--md-text-secondary)" }} />
-                            <span className="text-sm font-semibold" style={{ color: paymentMethod === pm.id ? "var(--md-text-primary)" : "var(--md-text-secondary)" }}>
-                              {pm.label}
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handlePayment}
-                    disabled={processing}
-                    className="w-full rounded-xl py-3.5 text-sm font-bold transition-all duration-200"
-                    style={{
-                      background: processing
-                        ? "rgba(13,110,253,0.5)"
-                        : "linear-gradient(135deg, #0d6efd, #0754c9)",
-                      color: "#fff",
-                      boxShadow: processing ? "none" : "0 4px 18px rgba(13,110,253,0.35)",
-                    }}
-                  >
-                    {processing ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        Processing...
-                      </span>
-                    ) : (
-                      `Pay LKR ${paymentAmount.toLocaleString()}`
-                    )}
-                  </button>
+                  <Field label="Card Number">
+                    <Input inputMode="numeric" placeholder="4242 4242 4242 4242" value={paymentFieldValue("cardNumber")} onChange={(event) => updatePaymentField("cardNumber", event.target.value)} />
+                  </Field>
+                  <Field label="Card Holder">
+                    <Input placeholder="Student name" value={paymentFieldValue("cardHolder")} onChange={(event) => updatePaymentField("cardHolder", event.target.value)} />
+                  </Field>
+                  <Field label="Expiry">
+                    <Input placeholder="MM/YY" value={paymentFieldValue("expiry")} onChange={(event) => updatePaymentField("expiry", event.target.value)} />
+                  </Field>
+                  <Field label="CVV">
+                    <Input inputMode="numeric" placeholder="123" value={paymentFieldValue("cvv")} onChange={(event) => updatePaymentField("cvv", event.target.value)} />
+                  </Field>
                 </>
               )}
-            </motion.div>
-          </motion.div>
-        )}
-      </div>
+
+              {(paymentForm.method === "Bank Transfer" || paymentForm.method === "Internet Banking") && (
+                <>
+                  <Field label="Bank">
+                    <Input placeholder="Bank name" value={paymentFieldValue("bankName")} onChange={(event) => updatePaymentField("bankName", event.target.value)} />
+                  </Field>
+                  <Field label="Transfer Reference">
+                    <Input placeholder="Bank transaction reference" value={paymentFieldValue("bankReference")} onChange={(event) => updatePaymentField("bankReference", event.target.value)} />
+                  </Field>
+                </>
+              )}
+
+              {paymentForm.method === "Mobile Wallet" && (
+                <Field label="Wallet / Mobile Number">
+                  <Input placeholder="+94 mobile number" value={paymentFieldValue("walletNumber")} onChange={(event) => updatePaymentField("walletNumber", event.target.value)} />
+                </Field>
+              )}
+
+              {paymentForm.method === "UPI/QR Payment" && (
+                <>
+                  <div className="flex min-h-36 items-center justify-center rounded-lg border border-dashed border-[color:var(--md-border)] bg-[color:var(--md-hover)] text-center text-sm font-black text-[color:var(--md-text-secondary)]">
+                    DEMO QR
+                  </div>
+                  <Field label="UPI / QR Reference">
+                    <Input placeholder="upi-id or scan reference" value={paymentFieldValue("upiId")} onChange={(event) => updatePaymentField("upiId", event.target.value)} />
+                  </Field>
+                </>
+              )}
+
+              {gatewayMethods.includes(paymentForm.method) && (
+                <Field label={`${paymentForm.method} Account`}>
+                  <Input type="email" placeholder="student@example.com" value={paymentFieldValue("gatewayEmail")} onChange={(event) => updatePaymentField("gatewayEmail", event.target.value)} />
+                </Field>
+              )}
+
+              <Field label="Payment Reference">
+                <Input value={paymentFieldValue("reference")} onChange={(event) => updatePaymentField("reference", event.target.value)} />
+              </Field>
+            </div>
+
+            <div className="mt-5 rounded-lg bg-[color:var(--md-hover)] p-4 text-sm text-[color:var(--md-text-secondary)]">
+              <strong className="text-[color:var(--md-text-primary)]">Test mode:</strong> no real money is charged. Confirming this payment records it in the student history and creates a downloadable receipt.
+            </div>
+
+            <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <SecondaryButton type="button" onClick={() => setPaymentPortal(null)}>Cancel</SecondaryButton>
+              <PrimaryButton type="submit" disabled={recordPayment.isPending}>
+                <CreditCard size={16} />
+                {recordPayment.isPending ? "Processing..." : `Confirm ${currency(paymentForm.amount)}`}
+              </PrimaryButton>
+            </div>
+          </form>
+        </div>
+      )}
     </section>
   );
 }

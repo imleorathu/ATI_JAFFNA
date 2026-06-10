@@ -3,3 +3,9 @@ node_modules/
 .mongodb-log/
 uploads/
 .env
+Backend/backend-run.*.log
+*.log
+dist/
+Frontend/dist/
+Backend/node_modules/
+Frontend/node_modules/

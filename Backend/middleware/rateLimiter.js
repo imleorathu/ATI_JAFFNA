@@ -9,7 +9,7 @@ const DEFAULT_CONFIG = {
 
 const STRICT_CONFIG = {
   windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 20,
+  max: process.env.NODE_ENV === "production" ? 20 : 200,
   message: "Too many authentication attempts. Please try again later.",
   statusCode: 429
 };

@@ -1,25 +1,54 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, CheckCircle2, LockKeyhole, Mail } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Sparkles } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx";
-import GlassCard from "../components/GlassCard.jsx";
-import SectionHeader from "../components/SectionHeader.jsx";
+import OrganizationBrand from "../components/OrganizationBrand.jsx";
+import { useLanguage } from "../contexts/LanguageContext.jsx";
 
 const portalPathForRole = (role) => {
   const normalized = String(role || "student").toLowerCase();
   if (normalized === "admin") return "/admin";
-  if (normalized === "faculty" || normalized === "lecturer") return "/faculty";
-  if (normalized === "parent") return "/parent";
+  if (normalized === "finance_officer" || normalized === "finance") return "/finance";
+  if (normalized === "department_staff") return "/faculty";
+  if (normalized === "faculty" || normalized === "lecturer" || normalized === "staff") return "/faculty";
   return "/student";
 };
 
+const cardEntrance = {
+  hidden: { opacity: 0, y: 28, scale: 0.975 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { type: "spring", stiffness: 120, damping: 19, mass: 0.85, staggerChildren: 0.08 }
+  }
+};
+
+const panelEntrance = {
+  hidden: (direction) => ({ opacity: 0, x: direction * 30 }),
+  visible: { opacity: 1, x: 0, transition: { duration: 0.48, ease: [0.16, 1, 0.3, 1] } }
+};
+
+const formEntrance = {
+  hidden: {},
+  visible: { transition: { delayChildren: 0.16, staggerChildren: 0.045 } }
+};
+
+const fieldEntrance = {
+  hidden: { opacity: 0, y: 12 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.32, ease: "easeOut" } }
+};
+
 export default function Login() {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,12 +56,17 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const data = await login(email, password);
+      const data = await login(identifier, password);
       if (data?.user?.mustChangePassword) {
         navigate("/change-password", { replace: true });
         return;
       }
-      navigate(portalPathForRole(data?.user?.role), { replace: true });
+      const role = String(data?.user?.role || "").toLowerCase();
+      if (role === "student") {
+        navigate("/", { replace: true });
+      } else {
+        navigate(portalPathForRole(role), { replace: true });
+      }
     } catch (err) {
       setError(err?.message || "Unable to login. Please check your credentials.");
     } finally {
@@ -41,83 +75,104 @@ export default function Login() {
   };
 
   return (
-    <section className="page-section min-h-screen bg-gradient-to-b from-[#f7fbff] via-[#f0f4f8] to-[#e8edf2] pt-32">
-      <div className="mx-auto max-w-7xl">
-        <SectionHeader eyebrow="Login" title="Sign in to your ATI Jaffna workspace" text="Access your dashboard, academic records, notices, and learning tools." />
-        <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[0.95fr_1.05fr]">
-          <GlassCard className="h-full">
-            <h3 className="text-xl font-black text-clay-text">Portal access</h3>
-            <div className="mt-5 grow space-y-3 text-sm text-clay-muted">
-              {["Role-based dashboard routing", "Academic records and payments", "Campus notices and LMS tools"].map((item) => (
-                <p key={item} className="flex gap-2">
-                  <CheckCircle2 className="shrink-0 text-clay-accent" size={18} />
-                  {item}
-                </p>
-              ))}
-            </div>
-          </GlassCard>
+    <section className="login-page-shell">
+      <motion.div className="login-page-orb login-page-orb-one" animate={{ x: [0, 18, 0], y: [0, -12, 0] }} transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }} />
+      <motion.div className="login-page-orb login-page-orb-two" animate={{ x: [0, -16, 0], y: [0, 14, 0] }} transition={{ duration: 11, repeat: Infinity, ease: "easeInOut" }} />
+      <motion.div className="login-card" variants={cardEntrance} initial="hidden" animate="visible">
+        <motion.aside className="login-brand-panel" custom={-1} variants={panelEntrance}>
+          <div>
+            <OrganizationBrand variant="login" />
+            <p className="login-eyebrow">
+              <Sparkles size={15} />
+              {t("auth.official")}
+            </p>
+            <h1>{t("auth.loginTitle")}</h1>
+            <p className="login-brand-copy">{t("auth.loginText")}</p>
+          </div>
 
-          <GlassCard className="h-full">
-            <h3 className="text-xl font-black text-clay-text">Welcome back</h3>
-            <p className="mt-2 text-sm leading-6 text-clay-muted">Sign in once and we will open the right dashboard for your account.</p>
-          <form onSubmit={handleSubmit} className="mt-5 space-y-5">
-            <label className="block text-sm font-semibold text-clay-text">
-              Email address
-              <span className="mt-2 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-[var(--clay-inset)] focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/10">
-                <Mail size={18} className="text-clay-accent" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  required
-                  autoComplete="email"
-                  className="min-w-0 flex-1 bg-transparent text-clay-text outline-none placeholder:text-slate-400"
-                  placeholder="you@atijaffna.edu.lk"
-                />
-              </span>
-            </label>
+          <div className="login-security-note">
+            <ShieldCheck size={19} />
+            <span>Secure access for ATI Jaffna students and staff.</span>
+          </div>
+        </motion.aside>
 
-            <label className="block text-sm font-semibold text-clay-text">
-              Password
-              <span className="mt-2 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-[var(--clay-inset)] focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/10">
-                <LockKeyhole size={18} className="text-clay-accent" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
-                  autoComplete="current-password"
-                  className="min-w-0 flex-1 bg-transparent text-clay-text outline-none placeholder:text-slate-400"
-                  placeholder="Enter password"
-                />
-              </span>
-            </label>
+        <motion.div className="login-form-panel" custom={1} variants={panelEntrance}>
+          <div className="login-form-heading">
+            <p>{t("nav.login")}</p>
+            <h2>{t("auth.welcome")}</h2>
+            <span>{t("auth.welcomeText")}</span>
+          </div>
+
+          <motion.form onSubmit={handleSubmit} className="login-form" variants={formEntrance}>
+            <motion.div variants={fieldEntrance}>
+              <label className="login-field">
+                <span>Email or Student ID</span>
+                <div className="login-input-wrap">
+                  <Mail size={18} />
+                  <input
+                    type="text"
+                    value={identifier}
+                    onChange={(event) => setIdentifier(event.target.value)}
+                    required
+                    autoComplete="username"
+                    placeholder="you@atijaffna.edu.lk or ATI Student ID"
+                  />
+                </div>
+              </label>
+            </motion.div>
+
+            <motion.div variants={fieldEntrance}>
+              <label className="login-field">
+                <span>{t("auth.password")}</span>
+                <div className="login-input-wrap">
+                  <LockKeyhole size={18} />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    required
+                    autoComplete="current-password"
+                    placeholder={t("auth.passwordPlaceholder")}
+                  />
+                  <button
+                    type="button"
+                    className="login-password-toggle"
+                    onClick={() => setShowPassword((current) => !current)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </label>
+            </motion.div>
 
             {error && (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+              <motion.div variants={fieldEntrance} className="login-error">
                 {error}
-              </div>
+              </motion.div>
             )}
 
-            <button
+            <motion.button
               type="submit"
               disabled={loading}
-              className="clay-btn-primary w-full gap-2 py-3 disabled:cursor-not-allowed disabled:opacity-70"
+              className="login-submit-button"
+              variants={fieldEntrance}
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.985 }}
             >
-              {loading ? "Signing in..." : "Sign in"}
+              {loading ? t("auth.signingIn") : t("auth.signIn")}
               {!loading && <ArrowRight size={17} />}
-            </button>
+            </motion.button>
 
-            <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 text-sm text-clay-muted sm:flex-row sm:items-center sm:justify-between">
-              <p>New to ATI Jaffna?</p>
-              <Link to="/register" className="font-bold text-clay-accent transition hover:text-blue-700">
-                Create an account
+            <motion.div className="login-register-row" variants={fieldEntrance}>
+              <p>{t("auth.newUser")}</p>
+              <Link to="/register">
+                {t("auth.createAccount")}
               </Link>
-            </div>
-          </form>
-          </GlassCard>
-        </div>
-      </div>
+            </motion.div>
+          </motion.form>
+        </motion.div>
+      </motion.div>
     </section>
   );
 }

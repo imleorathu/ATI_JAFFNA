@@ -2,7 +2,8 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Bus, MapPin, Clock, Route, Navigation, Bell, Users, CreditCard } from "lucide-react";
 import GlassCard from "../../components/GlassCard";
-import { transportData } from "../../data";
+import { transportData as fallbackTransportData } from "../../data";
+import usePortalData from "../../hooks/usePortalData";
 
 const containerVariants = {
   hidden: {},
@@ -26,6 +27,7 @@ const stopCoordinates = [
 const studentCapacity = { current: 28, max: 45 };
 
 export default function TransportPage() {
+  const { transportData = fallbackTransportData } = usePortalData({ transportData: fallbackTransportData });
   const [alertSubscribed, setAlertSubscribed] = useState(false);
 
   return (

@@ -22,6 +22,7 @@ import {
 import GlassCard from "../../components/GlassCard";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiFetch, downloadCsv } from "../../lib/api";
+import { useModal } from "../../contexts/ModalContext.jsx";
 
 const hnditDepartment = "Higher National Diploma in Information Technology - (HNDIT)";
 const hnditGroups = ["First year Full Time", "Second year Full Time", "First year Part Time", "Second year Part Time"];
@@ -76,6 +77,7 @@ function submissionStatus(assignment, submission) {
 }
 
 export default function AssignmentsPage() {
+  const { confirm, requestText } = useModal();
   const { user } = useAuth();
   const role = String(user?.role || "").toLowerCase();
   const canManage = ["lecturer", "admin"].includes(role);
@@ -241,8 +243,13 @@ export default function AssignmentsPage() {
     }
   };
 
-  const addLink = (key, type = "link") => {
-    const url = window.prompt(type === "youtube" ? "Paste YouTube/video link" : "Paste external link");
+  const addLink = async (key, type = "link") => {
+    const url = await requestText({
+      title: type === "youtube" ? "Add video link" : "Add external link",
+      message: "Paste the complete URL below.",
+      placeholder: "https://example.com/resource",
+      confirmLabel: "Add link"
+    });
     if (!url) return;
     setForm((current) => ({ ...current, [key]: [...current[key], { name: url, url, type }] }));
   };
@@ -286,7 +293,7 @@ export default function AssignmentsPage() {
   };
 
   const deleteAssignment = async (assignment) => {
-    if (!window.confirm(`Delete assignment "${assignment.title}"?`)) return;
+    if (!await confirm({ title: "Delete assignment?", message: `Delete "${assignment.title}" permanently?`, confirmLabel: "Delete assignment", tone: "danger" })) return;
     setError("");
     setStatus("");
     try {

@@ -21,21 +21,45 @@ import { useLocation } from "react-router-dom";
 import GlassCard from "./GlassCard";
 import { useAuth } from "../contexts/AuthContext";
 import { apiFetch } from "../lib/api";
+import { useLanguage } from "../contexts/LanguageContext.jsx";
+import { useModal } from "../contexts/ModalContext.jsx";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 const quickPrompts = [
-  "What is the due date for SE assignment?",
-  "Summarize week 5 lecture",
-  "What are the exam rules?",
-  "Give me notes for database normalization",
-  "What announcements were posted today?"
+  "Plan my study week from my deadlines",
+  "Explain my attendance and risk level",
+  "Analyze my GPA and weak subjects",
+  "What should I do before my next class?",
+  "Summarize my academic progress",
+  "Tutor me on a difficult topic",
+  "Debug my programming error",
+  "Prepare me for an internship interview"
+];
+
+const studentFloatingPrompts = [
+  "What should I focus on today?",
+  "Build a personalized study plan",
+  "Check my attendance risks",
+  "Find my urgent deadlines",
+  "Explain my GPA progress",
+  "Coach me through this subject",
+  "Summarize my notices and tasks",
+  "Create a revision timetable",
+  "Run a mock interview",
+  "What can you do for me?"
 ];
 
 const starterMessage = {
   id: 1,
   sender: "bot",
-  text: "Hi, I am your ATI Jaffna RAG assistant. Ask a question and I will search department materials before answering."
+  text: "Hi! I am **ATI Buddy Pro**, your personalized student copilot. I can help like a ChatGPT-style university assistant: study planning, timetable questions, attendance risks, GPA progress, assignments, uploaded notes, coding help, career preparation, and next-step guidance from your portal context. What should we work on first?"
+};
+
+const publicStarterMessage = {
+  id: "public-starter",
+  sender: "bot",
+  text: "Hi! I am ATI Buddy. Ask me anything about ATI Jaffna, student login, courses, campus life, study help, or general questions. I will keep it friendly and clear."
 };
 
 function localAssistantAnswer(question) {
@@ -43,6 +67,9 @@ function localAssistantAnswer(question) {
   if (lower.includes("upload") || lower.includes("document")) return "Log in to the student or faculty portal to use RAG document upload and indexed knowledge search.";
   if (lower.includes("assignment") || lower.includes("due")) return "Assignment due dates are available inside the student portal. The RAG assistant can answer from uploaded department materials after login.";
   if (lower.includes("attendance")) return "Attendance is managed in the student portal with GPS-based rules and department-scoped staff reports.";
+  if (lower.includes("gpa") || lower.includes("grade")) return "GPA and grade analysis needs your private student dashboard records. Please log in and ask ATI Buddy from the portal.";
+  if (lower.includes("timetable") || lower.includes("class")) return "Class timetable answers are available after login, where ATI Buddy can read your department and study-year schedule.";
+  if (lower.includes("code") || lower.includes("mongodb") || lower.includes("debug")) return "I can help with programming questions after login. Paste the error message and ATI Buddy will explain likely causes and fixes.";
   return "Please log in to use the full RAG assistant with document retrieval, conversation history, and department knowledge search.";
 }
 
@@ -81,10 +108,18 @@ function Avatar({ sender }) {
 
 function TypingDots() {
   return (
-    <div className="flex items-center gap-1 rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] px-4 py-3">
-      {[0, 1, 2].map((dot) => (
-        <span key={dot} className="h-2 w-2 rounded-full bg-[color:var(--md-text-secondary)]" style={{ animation: `aiTyping 1.1s ${dot * 0.16}s infinite ease-in-out` }} />
-      ))}
+    <div className="ati-thinking" role="status" aria-label="ATI Buddy is thinking">
+      <span className="ati-thinking-orb">
+        <Sparkles size={14} />
+      </span>
+      <span className="ati-thinking-copy">
+        <span>ATI Buddy is thinking</span>
+        <span className="ati-thinking-dots">
+          {[0, 1, 2].map((dot) => (
+            <i key={dot} style={{ animationDelay: `${dot * 0.16}s` }} />
+          ))}
+        </span>
+      </span>
     </div>
   );
 }
@@ -95,11 +130,11 @@ export default function AIAssistant() {
   return isPortalPage ? <AIAssistantPage /> : <FloatingAssistant />;
 }
 
-function readChatHistory(historyKey) {
+function readChatHistory(historyKey, defaultMessages = [starterMessage]) {
   try {
-    return JSON.parse(localStorage.getItem(historyKey) || "null") || [starterMessage];
+    return JSON.parse(localStorage.getItem(historyKey) || "null") || defaultMessages;
   } catch {
-    return [starterMessage];
+    return defaultMessages;
   }
 }
 
@@ -177,6 +212,215 @@ function useRagChat(activeDocumentId = "", userKey = "guest") {
   return { messages, setMessages, isTyping, sendMessage, clearHistory };
 }
 
+function usePublicChat() {
+  const { language, t } = useLanguage();
+  const historyKey = `atiPublicChatHistory:${language}`;
+  const starter = useMemo(() => ({ ...publicStarterMessage, text: t("chat.welcome") }), [t]);
+  const [messages, setMessages] = useState(() => readChatHistory(historyKey, [starter]));
+  const [isTyping, setIsTyping] = useState(false);
+
+  useEffect(() => {
+    setMessages(readChatHistory(historyKey, [starter]));
+  }, [historyKey, starter]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(historyKey, JSON.stringify(messages.slice(-40)));
+    } catch {
+      // Ignore localStorage write failures; chat can still continue.
+    }
+  }, [messages]);
+
+  const sendMessage = async (text) => {
+    const question = String(text || "").trim();
+    if (!question || isTyping) return;
+    const botId = nextId();
+    setMessages((current) => [...current, { id: nextId(), sender: "user", text: question }, { id: botId, sender: "bot", text: "" }]);
+    setIsTyping(true);
+
+    try {
+      const response = await fetch(`${API_BASE}/api/ai/public-chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: question, language })
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || "Unable to get an AI response.");
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      while (!done) {
+        const result = await reader.read();
+        done = result.done;
+        const chunk = decoder.decode(result.value || new Uint8Array(), { stream: !done });
+        if (chunk) {
+          setMessages((current) => current.map((message) => (message.id === botId ? { ...message, text: `${message.text}${chunk}` } : message)));
+        }
+      }
+    } catch (error) {
+      setMessages((current) => current.map((message) => (message.id === botId ? { ...message, text: error.message || "AI response failed." } : message)));
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const clearHistory = () => {
+    localStorage.removeItem(historyKey);
+    setMessages([starter]);
+  };
+
+  return { messages, isTyping, sendMessage, clearHistory };
+}
+
+function PublicChatSurface() {
+  const { t } = useLanguage();
+  const { messages, isTyping, sendMessage, clearHistory } = usePublicChat();
+  const [input, setInput] = useState("");
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isTyping]);
+
+  const submit = (textOverride = "") => {
+    sendMessage(textOverride || input);
+    setInput("");
+  };
+
+  return (
+    <div className="public-chat-surface">
+      <div className="public-chat-messages" aria-live="polite">
+        {messages.map((message) => (
+          <motion.div key={message.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`public-chat-message ${message.sender === "user" ? "public-chat-message-user" : ""}`}>
+            <Avatar sender={message.sender} />
+            <div className={`public-chat-message-bubble ${message.sender === "user" ? "public-chat-message-bubble-user" : "public-chat-message-bubble-bot"}`}>
+              {message.text ? renderMarkdown(message.text) : <TypingDots />}
+            </div>
+          </motion.div>
+        ))}
+        {messages.length === 1 && (
+          <div className="public-chat-suggestions">
+            <p>{t("chat.popular")}</p>
+            <div>
+              {[t("chat.questionCourses"), t("chat.questionContact"), t("chat.questionLogin")].map((prompt) => (
+                <button key={prompt} type="button" onClick={() => submit(prompt)}>
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      <div className="public-chat-composer">
+        <div className="public-chat-composer-meta">
+          <span>{t("chat.prompt")}</span>
+          <button type="button" onClick={clearHistory}>
+            <Trash2 size={13} />
+            {t("chat.clear")}
+          </button>
+        </div>
+        <div className="public-chat-composer-row">
+          <textarea
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                submit();
+              }
+            }}
+            rows={1}
+            maxLength={2000}
+            placeholder={t("chat.placeholder")}
+            aria-label={t("chat.placeholder")}
+          />
+          <button type="button" onClick={() => submit()} disabled={!input.trim() || isTyping} aria-label={t("chat.send")} className="public-chat-send">
+            <Send size={18} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StudentFloatingChatSurface() {
+  const { user } = useAuth();
+  const userKey = String(user?.id || user?._id || user?.email || "guest");
+  const { messages, isTyping, sendMessage, clearHistory } = useRagChat("", userKey);
+  const [input, setInput] = useState("");
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isTyping]);
+
+  const submit = (textOverride = "") => {
+    sendMessage(textOverride || input);
+    setInput("");
+  };
+
+  return (
+    <div className="public-chat-surface">
+      <div className="public-chat-messages" aria-live="polite">
+        {messages.map((message) => (
+          <motion.div key={message.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`public-chat-message ${message.sender === "user" ? "public-chat-message-user" : ""}`}>
+            <Avatar sender={message.sender} />
+            <div className={`public-chat-message-bubble ${message.sender === "user" ? "public-chat-message-bubble-user" : "public-chat-message-bubble-bot"}`}>
+              {message.text ? renderMarkdown(message.text) : <TypingDots />}
+            </div>
+          </motion.div>
+        ))}
+        {messages.length === 1 && (
+          <div className="public-chat-suggestions">
+            <p>Personalized copilot options</p>
+            <div>
+              {studentFloatingPrompts.map((prompt) => (
+                <button key={prompt} type="button" onClick={() => submit(prompt)}>
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      <div className="public-chat-composer">
+        <div className="public-chat-composer-meta">
+          <span>Ask for planning, tutoring, deadlines, GPA, attendance, coding, documents, or career help.</span>
+          <button type="button" onClick={clearHistory}>
+            <Trash2 size={13} />
+            Clear
+          </button>
+        </div>
+        <div className="public-chat-composer-row">
+          <textarea
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                submit();
+              }
+            }}
+            rows={1}
+            maxLength={2000}
+            placeholder="Message ATI Buddy Pro..."
+            aria-label="Message ATI Buddy Pro"
+          />
+          <button type="button" onClick={() => submit()} disabled={!input.trim() || isTyping} aria-label="Send message" className="public-chat-send">
+            <Send size={18} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ChatSurface({ compact = false, activeDocument = null, allowStudentDocumentUpload = false, onTemporaryDocumentUploaded, onClearActiveDocument }) {
   const { user } = useAuth();
   const userKey = String(user?.id || user?._id || user?.email || "guest");
@@ -233,9 +477,9 @@ function ChatSurface({ compact = false, activeDocument = null, allowStudentDocum
               <Sparkles size={20} />
             </div>
             <div>
-              <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">RAG AI Chat Assistant</h2>
+              <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">ATI Buddy Pro - Personalized Student Copilot</h2>
               <p className="text-xs text-[color:var(--md-text-secondary)]">
-                {activeDocument ? `Reading selected file: ${activeDocument.title}` : "Searching department knowledge and portal context"}
+                {activeDocument ? `Reading selected file: ${activeDocument.title}` : "ChatGPT-style help using portal context, student records, timetable, grades, deadlines, and RAG documents"}
               </p>
             </div>
           </div>
@@ -299,7 +543,7 @@ function ChatSurface({ compact = false, activeDocument = null, allowStudentDocum
               }
             }}
             rows={1}
-            placeholder={activeDocument ? "Ask anything about this selected document..." : "Ask about assignments, lecture notes, announcements, rules..."}
+            placeholder={activeDocument ? "Ask ATI Buddy Pro anything about this selected document..." : "Message ATI Buddy Pro about study plans, GPA, attendance, timetable, code, or careers..."}
             className="min-h-12 min-w-0 flex-1 resize-none rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] px-4 py-3 text-sm text-[color:var(--md-text-primary)] outline-none placeholder:text-[color:var(--md-text-secondary)] focus:border-sky-400/60"
           />
           <button type="button" onClick={() => submit()} disabled={!input.trim() || isTyping} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-sky-500 text-slate-950 transition hover:bg-sky-400 disabled:bg-[color:var(--md-hover)] disabled:text-[color:var(--md-text-secondary)]">
@@ -329,6 +573,7 @@ function ChatSurface({ compact = false, activeDocument = null, allowStudentDocum
 }
 
 function AIAssistantPage() {
+  const { confirm } = useModal();
   const { user } = useAuth();
   const role = String(user?.role || "").toLowerCase();
   const userKey = String(user?.id || user?._id || user?.email || "guest");
@@ -401,7 +646,7 @@ function AIAssistantPage() {
   };
 
   const deleteDocument = async (document) => {
-    if (!window.confirm(`Delete ${document.title}?`)) return;
+    if (!await confirm({ title: "Delete knowledge document?", message: `Delete "${document.title}" and remove it from AI retrieval?`, confirmLabel: "Delete document", tone: "danger" })) return;
     setError("");
     try {
       await apiFetch(`/api/ai/knowledge/${document._id}`, { method: "DELETE" });
@@ -522,7 +767,7 @@ function AIAssistantPage() {
                 <input value={uploadForm.title} onChange={(event) => setUploadForm((current) => ({ ...current, title: event.target.value }))} placeholder="Title" className="w-full rounded-lg border border-[color:var(--md-border)] bg-slate-950 px-3 py-2.5 text-sm text-[color:var(--md-text-primary)] outline-none focus:border-sky-400" />
                 <input value={uploadForm.topicModule} onChange={(event) => setUploadForm((current) => ({ ...current, topicModule: event.target.value }))} placeholder="Topic / module / week" className="w-full rounded-lg border border-[color:var(--md-border)] bg-slate-950 px-3 py-2.5 text-sm text-[color:var(--md-text-primary)] outline-none focus:border-sky-400" />
                 {role === "admin" && (
-                  <input value={uploadForm.department} onChange={(event) => setUploadForm((current) => ({ ...current, department: event.target.value }))} placeholder="Department" className="w-full rounded-lg border border-[color:var(--md-border)] bg-slate-950 px-3 py-2.5 text-sm text-[color:var(--md-text-primary)] outline-none focus:border-sky-400" />
+                  <input value={uploadForm.department} onChange={(event) => setUploadForm((current) => ({ ...current, department: event.target.value }))} placeholder="Department (blank = All Departments)" className="w-full rounded-lg border border-[color:var(--md-border)] bg-slate-950 px-3 py-2.5 text-sm text-[color:var(--md-text-primary)] outline-none focus:border-sky-400" />
                 )}
                 <button type="button" onClick={openUploadPicker} disabled={uploading} className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-[color:var(--md-border)] bg-slate-950 px-4 py-8 text-sm font-bold text-[color:var(--md-text-secondary)] hover:border-sky-400 hover:text-[color:var(--md-text-primary)] disabled:cursor-not-allowed disabled:opacity-60">
                   <Upload size={18} />
@@ -605,35 +850,145 @@ function AIAssistantPage() {
   );
 }
 
+function CartoonAssistant({ isOpen, variant = "cute" }) {
+  const isPro = variant === "pro";
+  return (
+    <span className={`cartoon-assistant ${isOpen ? "cartoon-assistant-open" : ""} ${isPro ? "cartoon-assistant-pro-eyes" : ""}`} aria-hidden="true">
+      <span className="cartoon-assistant-shadow" />
+      <span className="cartoon-assistant-antenna">
+        <span className="cartoon-assistant-antenna-light" />
+      </span>
+      <span className="cartoon-assistant-ear cartoon-assistant-ear-left" />
+      <span className="cartoon-assistant-ear cartoon-assistant-ear-right" />
+      <span className="cartoon-assistant-head">
+        <span className="cartoon-assistant-face">
+          {isOpen ? (
+            <X className="cartoon-assistant-close" size={22} strokeWidth={3} />
+          ) : (
+            <>
+              <span className="cartoon-assistant-brow cartoon-assistant-brow-left" />
+              <span className="cartoon-assistant-brow cartoon-assistant-brow-right" />
+              <span className="cartoon-assistant-eye cartoon-assistant-eye-left" />
+              <span className="cartoon-assistant-eye cartoon-assistant-eye-right" />
+              <span className="cartoon-assistant-cheek cartoon-assistant-cheek-left" />
+              <span className="cartoon-assistant-cheek cartoon-assistant-cheek-right" />
+              <span className="cartoon-assistant-smile">
+                <span className="cartoon-assistant-teeth" />
+              </span>
+            </>
+          )}
+        </span>
+        <span className="cartoon-assistant-highlight" />
+      </span>
+      <span className="cartoon-assistant-hand cartoon-assistant-hand-left" />
+      <span className="cartoon-assistant-hand cartoon-assistant-hand-right" />
+    </span>
+  );
+}
+
 function FloatingAssistant() {
   const [isOpen, setIsOpen] = useState(false);
+  const { user, isAuthenticated } = useAuth();
+  const { language, t } = useLanguage();
+  const userKey = String(user?.id || user?._id || user?.email || "guest");
+  const robotButtonRef = useRef(null);
+  const assistantSeason = useMemo(() => {
+    const month = new Date().getMonth();
+    if (month >= 2 && month <= 4) return "spring";
+    if (month >= 5 && month <= 7) return "summer";
+    if (month >= 8 && month <= 10) return "autumn";
+    return "winter";
+  }, []);
+
+  useEffect(() => {
+    const updateEyeTracking = (event) => {
+      const button = robotButtonRef.current;
+      if (!button) return;
+      const rect = button.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const x = Math.max(-1, Math.min(1, (event.clientX - centerX) / (rect.width * 1.9)));
+      const y = Math.max(-1, Math.min(1, (event.clientY - centerY) / (rect.height * 1.9)));
+      button.style.setProperty("--buddy-eye-x", `${(x * 0.2).toFixed(3)}rem`);
+      button.style.setProperty("--buddy-eye-y", `${(y * 0.12).toFixed(3)}rem`);
+      button.style.setProperty("--buddy-depth-x", `${(x * 7).toFixed(3)}deg`);
+      button.style.setProperty("--buddy-depth-y", `${(y * -7).toFixed(3)}deg`);
+      button.style.setProperty("--buddy-light-x", `${(50 + x * 28).toFixed(2)}%`);
+      button.style.setProperty("--buddy-light-y", `${(42 + y * 24).toFixed(2)}%`);
+    };
+
+    const resetEyeTracking = () => {
+      const button = robotButtonRef.current;
+      if (!button) return;
+      button.style.setProperty("--buddy-eye-x", "0rem");
+      button.style.setProperty("--buddy-eye-y", "0rem");
+      button.style.setProperty("--buddy-depth-x", "0deg");
+      button.style.setProperty("--buddy-depth-y", "0deg");
+      button.style.setProperty("--buddy-light-x", "50%");
+      button.style.setProperty("--buddy-light-y", "42%");
+    };
+
+    window.addEventListener("pointermove", updateEyeTracking);
+    window.addEventListener("pointerleave", resetEyeTracking);
+
+    return () => {
+      window.removeEventListener("pointermove", updateEyeTracking);
+      window.removeEventListener("pointerleave", resetEyeTracking);
+      resetEyeTracking();
+    };
+  }, []);
+
+  const closeChat = () => {
+    localStorage.removeItem(`atiPublicChatHistory:${language}`);
+    localStorage.removeItem(`atiAiHistory:${userKey}:general`);
+    setIsOpen(false);
+  };
 
   return (
     <div className="fixed bottom-5 right-5 z-[9999] sm:bottom-6 sm:right-6">
       <AnimatePresence>
         {isOpen && (
-          <motion.div initial={{ opacity: 0, y: 60, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 30, scale: 0.96 }} transition={{ type: "spring", damping: 24, stiffness: 300 }} className="absolute bottom-20 right-0 flex h-[min(620px,calc(100vh-120px))] w-[calc(100vw-40px)] max-w-[420px] flex-col overflow-hidden rounded-2xl border border-[color:var(--md-border)] bg-[#0f172a]/95 shadow-2xl shadow-black/40 backdrop-blur-xl">
-            <div className="flex items-center justify-between border-b border-[color:var(--md-border)] bg-[color:var(--md-hover)] p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-sky-500 text-slate-950">
+          <motion.div initial={{ opacity: 0, y: 60, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 30, scale: 0.96 }} transition={{ type: "spring", damping: 24, stiffness: 300 }} className={`public-chat-window ${isAuthenticated ? "public-chat-window-pro" : ""}`}>
+            <div className="public-chat-header">
+              <div className="public-chat-header-main">
+                <div className="public-chat-header-icon">
                   <Sparkles size={20} />
                 </div>
                 <div>
-                  <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">AI Student Assistant</h2>
-                  <p className="text-xs text-[color:var(--md-text-secondary)]">RAG chat in the student portal</p>
+                  <div className="public-chat-heading">
+                    <h2>{isAuthenticated ? "ATI Buddy Pro" : "ATI Buddy"}</h2>
+                    <span className={isAuthenticated ? "public-chat-heading-pro" : ""}><i /> {isAuthenticated ? "Armed" : t("chat.online")}</span>
+                  </div>
+                  {!isAuthenticated && <p>{t("chat.subtitle")}</p>}
                 </div>
               </div>
-              <button type="button" onClick={() => setIsOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)] hover:text-[color:var(--md-text-primary)]">
+              <button type="button" onClick={closeChat} aria-label="Close ATI Buddy chatbot" className="public-chat-close">
                 <X size={18} />
               </button>
             </div>
-            <ChatSurface compact />
+            {isAuthenticated ? <StudentFloatingChatSurface /> : <PublicChatSurface />}
           </motion.div>
         )}
       </AnimatePresence>
 
-      <motion.button type="button" onClick={() => setIsOpen((prev) => !prev)} animate={{ y: [0, -4, 0] }} transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }} className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[color:var(--md-border)] bg-sky-500 text-slate-950 shadow-2xl shadow-sky-500/30">
-        {isOpen ? <X size={26} /> : <Bot size={28} />}
+      {!isOpen && <div className={`cartoon-assistant-bubble ${isAuthenticated ? "cartoon-assistant-bubble-pro" : ""}`}>{isAuthenticated ? "ATI Buddy Pro" : t("chat.title")} <Sparkles size={13} /></div>}
+      <motion.button
+        ref={robotButtonRef}
+        type="button"
+        onClick={() => {
+          if (isOpen) {
+            closeChat();
+            return;
+          }
+          setIsOpen(true);
+        }}
+        aria-label={isOpen ? "Close ATI Buddy chatbot" : "Open ATI Buddy chatbot"}
+        aria-expanded={isOpen}
+        whileHover={isAuthenticated ? { scale: 1.08, rotate: 3 } : { scale: 1.06, rotate: -2 }}
+        whileTap={isAuthenticated ? { scale: 0.92, rotate: -5 } : { scale: 0.94 }}
+        className={`cartoon-assistant-button cartoon-assistant-season-${assistantSeason} ${isAuthenticated ? "cartoon-assistant-button-pro-eyes" : ""}`}
+      >
+        <CartoonAssistant isOpen={isOpen} variant={isAuthenticated ? "pro" : "cute"} />
       </motion.button>
 
       <style>{`

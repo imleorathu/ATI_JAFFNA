@@ -13,8 +13,10 @@ import {
   X
 } from "lucide-react";
 import GlassCard from "../../components/GlassCard";
+import AppModal from "../../components/AppModal.jsx";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiFetch, downloadCsv } from "../../lib/api";
+import { useModal } from "../../contexts/ModalContext.jsx";
 
 const emptyForm = {
   title: "",
@@ -44,6 +46,7 @@ function departmentName(departments, id) {
 }
 
 export default function CourseManagement() {
+  const { confirm } = useModal();
   const { user } = useAuth();
   const isFaculty = String(user?.role || "").toLowerCase() === "lecturer";
   const [courses, setCourses] = useState([]);
@@ -154,7 +157,7 @@ export default function CourseManagement() {
   };
 
   const deleteCourse = async (course) => {
-    if (!window.confirm(`Delete ${course.title}?`)) return;
+    if (!await confirm({ title: "Delete course?", message: `Delete "${course.title}" permanently?`, confirmLabel: "Delete course", tone: "danger" })) return;
     setError("");
     try {
       await apiFetch(`/api/courses/${course._id}`, { method: "DELETE" });
@@ -189,7 +192,7 @@ export default function CourseManagement() {
   };
 
   const bulkDelete = async () => {
-    if (!selectedIds.length || !window.confirm(`Delete ${selectedIds.length} selected courses?`)) return;
+    if (!selectedIds.length || !await confirm({ title: "Delete selected courses?", message: `Delete ${selectedIds.length} selected courses permanently?`, confirmLabel: "Delete courses", tone: "danger" })) return;
     setError("");
     try {
       await Promise.all(selectedIds.map((id) => apiFetch(`/api/courses/${id}`, { method: "DELETE" })));
@@ -274,7 +277,8 @@ export default function CourseManagement() {
       </div>
 
       {showForm && (
-        <GlassCard className="p-5">
+        <AppModal open={showForm} onClose={resetForm} size="lg" hideClose>
+        <GlassCard className="m-0 p-5">
           <form onSubmit={saveCourse} className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="classroom-section-title">{editingId ? "Edit Course" : "Add Course"}</h2>
@@ -306,6 +310,7 @@ export default function CourseManagement() {
             </button>
           </form>
         </GlassCard>
+        </AppModal>
       )}
 
       <GlassCard className="p-5">

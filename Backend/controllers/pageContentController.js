@@ -67,47 +67,47 @@ const facultiesDefaults = {
     {
       type: "feature",
       layout: "grid",
-      title: "IT Department",
-      body: "Software, networking, databases, and practical digital problem solving.",
+      title: "Higher National Diploma in Information Technology - (HNDIT)",
+      body: "Information technology, software development, networking, databases, and practical digital problem solving.",
       imageUrl: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=900&q=80",
-      buttonText: "View Details",
-      buttonLink: "/courses"
+      buttonText: "",
+      buttonLink: ""
     },
     {
       type: "feature",
       layout: "grid",
-      title: "Management",
-      body: "Leadership, operations, accounting, and modern organizational practice.",
+      title: "Higher National Diploma in Management - (HNDM)",
+      body: "Management, leadership, operations, accounting, and modern organizational practice.",
       imageUrl: "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=900&q=80",
-      buttonText: "View Details",
-      buttonLink: "/courses"
+      buttonText: "",
+      buttonLink: ""
     },
     {
       type: "feature",
       layout: "grid",
-      title: "English",
-      body: "Communication, academic writing, literature, and professional fluency.",
+      title: "Higher National Diploma in English",
+      body: "English language, communication, academic writing, literature, and professional fluency.",
       imageUrl: "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=900&q=80",
-      buttonText: "View Details",
-      buttonLink: "/courses"
+      buttonText: "",
+      buttonLink: ""
     },
     {
       type: "feature",
       layout: "grid",
-      title: "Engineering Technology",
+      title: "Higher National Diploma in Engineering",
       body: "Applied engineering foundations with workshop and project-based learning.",
       imageUrl: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=900&q=80",
-      buttonText: "View Details",
-      buttonLink: "/courses"
+      buttonText: "",
+      buttonLink: ""
     },
     {
       type: "feature",
       layout: "grid",
-      title: "Business Studies",
-      body: "Entrepreneurship, commerce, finance, and practical business planning.",
+      title: "Higher National Diploma in Accountancy - (HNDA)",
+      body: "Accountancy, finance, taxation, auditing, and practical business reporting.",
       imageUrl: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=900&q=80",
-      buttonText: "View Details",
-      buttonLink: "/courses"
+      buttonText: "",
+      buttonLink: ""
     }
   ]
 };
@@ -264,12 +264,32 @@ async function ensurePages() {
       }
     }
   );
+
+  const facultiesPage = await PageContent.findOne({ slug: "faculties" });
+  if (facultiesPage) {
+    const removeDetailLinks = (sections = []) => sections.map((section) => {
+      const rawSection = section.toObject?.() || section;
+      const currentLink = String(section.buttonLink || "");
+      const isFacultyDetailLink = currentLink.startsWith("/faculties/");
+      return {
+        ...rawSection,
+        buttonText: isFacultyDetailLink || section.buttonText === "View Details" ? "" : section.buttonText,
+        buttonLink: isFacultyDetailLink ? "" : section.buttonLink
+      };
+    });
+
+    const draftContent = facultiesPage.draft?.toObject?.() || facultiesPage.draft || {};
+    const publishedContent = facultiesPage.published?.toObject?.() || facultiesPage.published || {};
+    facultiesPage.draft = normalizeContent({ ...draftContent, sections: removeDetailLinks(draftContent.sections || []) });
+    facultiesPage.published = normalizeContent({ ...publishedContent, sections: removeDetailLinks(publishedContent.sections || []) });
+    await facultiesPage.save();
+  }
 }
 
 export async function listPages(req, res, next) {
   try {
     await ensurePages();
-    const pages = await PageContent.find().sort({ title: 1 });
+    const pages = await PageContent.find({ slug: { $not: /^faculty-details/ } }).sort({ title: 1 });
     res.json(pages);
   } catch (error) {
     next(error);

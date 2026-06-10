@@ -7,6 +7,7 @@ const contactSchema = new mongoose.Schema(
     subject: { type: String, required: true, trim: true },
     message: { type: String, required: true, trim: true },
     type: { type: String, enum: ["contact", "complaint"], default: "contact" },
+    audience: { type: String, enum: ["admin", "department"], default: "admin" },
     department: { type: String, trim: true },
     student: { type: mongoose.Schema.Types.ObjectId, ref: "Student", default: null },
     studentName: { type: String, trim: true },
@@ -22,6 +23,7 @@ const contactSchema = new mongoose.Schema(
 );
 
 contactSchema.index({ department: 1, status: 1, createdAt: -1 });
+contactSchema.index({ audience: 1, department: 1, status: 1, createdAt: -1 });
 contactSchema.index({ student: 1, createdAt: -1 });
 
 export default mongoose.model("Contact", contactSchema);

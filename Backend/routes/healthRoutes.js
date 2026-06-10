@@ -77,6 +77,7 @@ router.get("/health/detailed", async (req, res) => {
 });
 
 router.get("/ready", (req, res) => {
+  const dbStates = ["disconnected", "connected", "connecting", "disconnecting"];
   const isReady = mongoose.connection.readyState === 1;
   if (isReady) {
     res.json({ status: "ready" });

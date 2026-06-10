@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Archive,
+  Building2,
   CheckCircle2,
   Clipboard,
   Download,
@@ -11,6 +12,7 @@ import {
   Reply,
   Search,
   Send,
+  ShieldCheck,
   Star,
   Trash2,
   UserCheck,
@@ -19,6 +21,7 @@ import {
 import GlassCard from "../../components/GlassCard";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiFetch, downloadCsv } from "../../lib/api";
+import { useModal } from "../../contexts/ModalContext.jsx";
 
 const emptyDraft = {
   subject: "",
@@ -39,6 +42,18 @@ const priorityStyles = {
   urgent: "bg-red-500/15 text-red-300"
 };
 
+const audienceLabels = {
+  admin: "Admin",
+  department: "Department staff"
+};
+
+const audienceStyles = {
+  admin: "bg-violet-500/15 text-violet-200",
+  department: "bg-teal-500/15 text-teal-200"
+};
+
+const departmentInboxRoles = ["lecturer", "department_staff"];
+
 function formatDate(value) {
   if (!value) return "No date";
   return new Intl.DateTimeFormat("en", {
@@ -57,6 +72,7 @@ function mailtoFor(message, draft = emptyDraft) {
 }
 
 function StaffMessagesPage({ role }) {
+  const { confirm } = useModal();
   const [messages, setMessages] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [selectedIds, setSelectedIds] = useState([]);
@@ -149,7 +165,7 @@ function StaffMessagesPage({ role }) {
   };
 
   const deleteMessage = async (message) => {
-    const confirmed = window.confirm(`Delete message from ${message.name}?`);
+    const confirmed = await confirm({ title: "Delete message?", message: `Delete the message from ${message.name}?`, confirmLabel: "Delete message", tone: "danger" });
     if (!confirmed) return;
 
     setSaving(message._id);
@@ -197,13 +213,14 @@ function StaffMessagesPage({ role }) {
       filteredMessages.map((message) => ({
         name: message.name,
         email: message.email,
-          subject: message.subject,
-          status: message.status,
-          priority: message.priority,
-          category: message.category,
-          department: message.department,
-          studentId: message.studentId,
-          assignedTo: message.assignedTo,
+        subject: message.subject,
+        status: message.status,
+        priority: message.priority,
+        category: message.category,
+        recipient: audienceLabels[message.audience] || "Admin",
+        department: message.department,
+        studentId: message.studentId,
+        assignedTo: message.assignedTo,
         createdAt: message.createdAt,
         message: message.message
       }))
@@ -232,16 +249,19 @@ function StaffMessagesPage({ role }) {
   };
 
   const allFilteredSelected = filteredMessages.length > 0 && filteredMessages.every((message) => selectedIds.includes(message._id));
+  const isDepartmentInbox = departmentInboxRoles.includes(role);
+  const pageTitle = isDepartmentInbox ? "Department Messages" : "Admin Messages";
+  const pageSubtitle = isDepartmentInbox
+    ? "Manage messages sent only to staff in your assigned department."
+    : "Manage messages sent directly to admin and public contact inquiries.";
 
   return (
     <section className="space-y-6">
       <div className="flex flex-col gap-4 pb-5 sm:flex-row sm:items-end sm:justify-between" style={{borderBottom:"1px solid var(--md-border)"}}>
         <div>
           <p className="portal-page-label">Communication</p>
-          <h1 className="portal-page-title">{role === "lecturer" ? "Department Complaints" : "Admin Messages"}</h1>
-          <p className="portal-page-subtitle">
-            {role === "lecturer" ? "Manage complaints sent by students in your assigned department only." : "Manage contact inquiries, replies, priorities, notes, and message status."}
-          </p>
+          <h1 className="portal-page-title">{pageTitle}</h1>
+          <p className="portal-page-subtitle">{pageSubtitle}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={loadMessages} type="button" className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] px-3 py-2 text-sm font-bold text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)]">
@@ -377,6 +397,7 @@ function StaffMessagesPage({ role }) {
                         <Badge className={statusStyles[message.status] || statusStyles.new}>{message.status || "new"}</Badge>
                         <Badge className={priorityStyles[message.priority] || priorityStyles.normal}>{message.priority || "normal"}</Badge>
                         <Badge className="bg-[color:var(--md-hover)] text-[color:var(--md-text-secondary)]">{message.category || "general"}</Badge>
+                        <Badge className={audienceStyles[message.audience] || audienceStyles.admin}>{audienceLabels[message.audience] || "Admin"}</Badge>
                         {message.department && <Badge className="bg-sky-500/10 text-sky-200">{message.department}</Badge>}
                       </div>
                     </div>
@@ -415,6 +436,7 @@ function StaffMessagesPage({ role }) {
                 <Info label="From" value={selectedMessage.name} />
                 <Info label="Email" value={selectedMessage.email} />
                 <Info label="Department" value={selectedMessage.department || "General contact"} />
+                <Info label="Recipient" value={audienceLabels[selectedMessage.audience] || "Admin"} />
                 <Info label="Student ID" value={selectedMessage.studentId || "-"} />
                 <Info label="Status" value={selectedMessage.status || "new"} />
                 <Info label="Replied" value={selectedMessage.repliedAt ? formatDate(selectedMessage.repliedAt) : "Not yet"} />
@@ -517,9 +539,10 @@ function StaffMessagesPage({ role }) {
   );
 }
 
-function StudentComplaintCenter({ user }) {
+function StudentMessageCenter({ user }) {
   const [messages, setMessages] = useState([]);
   const [form, setForm] = useState({ subject: "", category: "academic", priority: "normal", message: "" });
+  const [activeAudience, setActiveAudience] = useState("department");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -533,7 +556,7 @@ function StudentComplaintCenter({ user }) {
       const data = await apiFetch("/api/contacts");
       setMessages(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err?.message || "Unable to load your complaints.");
+      setError(err?.message || "Unable to load your messages.");
     } finally {
       setLoading(false);
     }
@@ -543,7 +566,7 @@ function StudentComplaintCenter({ user }) {
     loadMessages();
   }, []);
 
-  const sendComplaint = async (event) => {
+  const sendMessage = async (event) => {
     event.preventDefault();
     setSaving(true);
     setError("");
@@ -551,13 +574,13 @@ function StudentComplaintCenter({ user }) {
     try {
       const created = await apiFetch("/api/contacts", {
         method: "POST",
-        body: JSON.stringify(form)
+        body: JSON.stringify({ ...form, audience: activeAudience })
       });
       setMessages((current) => [created, ...current]);
       setForm({ subject: "", category: "academic", priority: "normal", message: "" });
-      setToast("Complaint sent to your department staff.");
+      setToast(activeAudience === "department" ? "Message sent to your department staff." : "Message sent to admin.");
     } catch (err) {
-      setError(err?.message || "Unable to send complaint.");
+      setError(err?.message || "Unable to send message.");
     } finally {
       setSaving(false);
     }
@@ -566,17 +589,34 @@ function StudentComplaintCenter({ user }) {
   const stats = {
     total: messages.length,
     new: messages.filter((message) => message.status === "new").length,
+    department: messages.filter((message) => (message.audience || "department") === "department").length,
+    admin: messages.filter((message) => message.audience === "admin").length,
     resolved: messages.filter((message) => message.status === "resolved").length
   };
+  const activeRecipient = activeAudience === "department" ? "department staff" : "admin";
+  const recipientOptions = [
+    {
+      id: "department",
+      title: "Message to Department",
+      text: department ? `Only ${department} staff can see this.` : "Only your department staff can see this.",
+      icon: Building2
+    },
+    {
+      id: "admin",
+      title: "Message to Admin",
+      text: "Only admin users can see this.",
+      icon: ShieldCheck
+    }
+  ];
 
   return (
     <section className="space-y-6">
       <div className="flex flex-col gap-4 pb-5 sm:flex-row sm:items-end sm:justify-between" style={{borderBottom:"1px solid var(--md-border)"}}>
         <div>
-          <p className="portal-page-label">Student Complaints</p>
-          <h1 className="portal-page-title">Department Messages</h1>
+          <p className="portal-page-label">Student Messages</p>
+          <h1 className="portal-page-title">Message Center</h1>
           <p className="portal-page-subtitle">
-            Your complaint will be sent only to staff in your department{department ? `: ${department}` : "."}
+            Choose department staff or admin before sending. Each message is visible only to the selected recipient.
           </p>
         </div>
         <button onClick={loadMessages} type="button" className="inline-flex w-fit items-center gap-2 rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] px-3 py-2 text-sm font-bold text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)]">
@@ -590,9 +630,9 @@ function StudentComplaintCenter({ user }) {
 
       <div className="grid gap-4 sm:grid-cols-3">
         {[
-          ["Total Complaints", stats.total, MessageSquare, "text-[color:var(--md-text-primary)]"],
-          ["New", stats.new, Mail, "text-sky-300"],
-          ["Resolved", stats.resolved, CheckCircle2, "text-emerald-300"]
+          ["Total Messages", stats.total, MessageSquare, "text-[color:var(--md-text-primary)]"],
+          ["Department", stats.department, Building2, "text-teal-300"],
+          ["Admin", stats.admin, ShieldCheck, "text-violet-300"]
         ].map(([label, value, Icon, color]) => (
           <GlassCard key={label} dark className="p-5">
             <div className="flex items-center justify-between">
@@ -608,8 +648,32 @@ function StudentComplaintCenter({ user }) {
 
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <GlassCard className="p-5">
-          <h2 className="classroom-section-title">Send Complaint</h2>
-          <form onSubmit={sendComplaint} className="mt-4 space-y-4">
+          <h2 className="classroom-section-title">Send Message</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {recipientOptions.map((option) => {
+              const Icon = option.icon;
+              const active = activeAudience === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setActiveAudience(option.id)}
+                  className={`rounded-lg border p-4 text-left transition ${
+                    active
+                      ? "border-sky-400 bg-sky-500/10 text-[color:var(--md-text-primary)]"
+                      : "border-[color:var(--md-border)] bg-[color:var(--md-hover)] text-[color:var(--md-text-secondary)] hover:border-sky-400/60"
+                  }`}
+                >
+                  <span className="flex items-center gap-2 text-sm font-black">
+                    <Icon size={17} />
+                    {option.title}
+                  </span>
+                  <span className="mt-2 block text-xs leading-5">{option.text}</span>
+                </button>
+              );
+            })}
+          </div>
+          <form onSubmit={sendMessage} className="mt-4 space-y-4">
             <input required value={form.subject} onChange={(event) => setForm((current) => ({ ...current, subject: event.target.value }))} placeholder="Subject" className="w-full portal-input" />
             <div className="grid gap-3 sm:grid-cols-2">
               <select value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))} className="portal-input">
@@ -625,24 +689,24 @@ function StudentComplaintCenter({ user }) {
                 <option value="low">Low</option>
               </select>
             </div>
-            <textarea required value={form.message} onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))} rows={7} placeholder="Explain your complaint" className="w-full resize-none portal-input" />
+            <textarea required value={form.message} onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))} rows={7} placeholder={`Write your message to ${activeRecipient}`} className="w-full resize-none portal-input" />
             <button type="submit" disabled={saving} className="portal-btn-primary">
               <Send size={16} />
-              {saving ? "Sending..." : "Send to Department Staff"}
+              {saving ? "Sending..." : activeAudience === "department" ? "Send to Department Staff" : "Send to Admin"}
             </button>
           </form>
         </GlassCard>
 
         <GlassCard className="overflow-hidden p-0">
           <div className="border-b border-[color:var(--md-border)] p-4">
-            <h2 className="classroom-section-title">My Complaints</h2>
-            <p className="text-xs text-[color:var(--md-text-secondary)]">Only your own complaints are shown here.</p>
+            <h2 className="classroom-section-title">My Messages</h2>
+            <p className="text-xs text-[color:var(--md-text-secondary)]">Only your own sent messages are shown here.</p>
           </div>
           <div className="max-h-[620px] overflow-y-auto">
             {loading ? (
-              <p className="p-8 text-center text-sm text-[color:var(--md-text-secondary)]">Loading complaints...</p>
+              <p className="p-8 text-center text-sm text-[color:var(--md-text-secondary)]">Loading messages...</p>
             ) : messages.length === 0 ? (
-              <p className="p-8 text-center text-sm text-[color:var(--md-text-secondary)]">No complaints sent yet.</p>
+              <p className="p-8 text-center text-sm text-[color:var(--md-text-secondary)]">No messages sent yet.</p>
             ) : (
               messages.map((message) => (
                 <div key={message._id} className="border-b border-[color:var(--md-border)] p-4">
@@ -654,6 +718,7 @@ function StudentComplaintCenter({ user }) {
                     <div className="flex flex-wrap gap-2">
                       <Badge className={statusStyles[message.status] || statusStyles.new}>{message.status || "new"}</Badge>
                       <Badge className={priorityStyles[message.priority] || priorityStyles.normal}>{message.priority || "normal"}</Badge>
+                      <Badge className={audienceStyles[message.audience] || audienceStyles.department}>{audienceLabels[message.audience] || "Department staff"}</Badge>
                     </div>
                   </div>
                   <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[color:var(--md-text-secondary)]">{message.message}</p>
@@ -671,7 +736,7 @@ function StudentComplaintCenter({ user }) {
 export default function MessagesPage() {
   const { user } = useAuth();
   const role = String(user?.role || "").toLowerCase();
-  return role === "student" ? <StudentComplaintCenter user={user} /> : <StaffMessagesPage role={role} />;
+  return role === "student" ? <StudentMessageCenter user={user} /> : <StaffMessagesPage role={role} />;
 }
 
 function Badge({ className, children }) {
