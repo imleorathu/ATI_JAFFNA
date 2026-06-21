@@ -1,11 +1,12 @@
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useReducedMotion, useScroll, useSpring, useTransform } from "framer-motion";
 import { ArrowRight, Bell, BookOpen, CalendarDays, GraduationCap, Newspaper, Users } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import GlassCard from "../components/GlassCard.jsx";
 import SectionHeader from "../components/SectionHeader.jsx";
 import CmsSections from "../components/CmsSections.jsx";
-import { courses, departments, stats as statCards } from "../data.js";
+import HeroSlider from "../components/HeroSlider.jsx";
+import { stats as statCards } from "../data.js";
 import useCmsPage, { usePageSeo } from "../hooks/useCmsPage.js";
 import { apiFetch } from "../lib/api.js";
 import heroBg from "../assets/ChatGPT Image May 22, 2026, 10_31_39 PM.png";
@@ -13,46 +14,109 @@ import { useLanguage } from "../contexts/LanguageContext.jsx";
 
 const icons = [BookOpen, GraduationCap, Users, Users, CalendarDays];
 const statKeys = ["courses", "departments", "students", "lecturers", "events"];
+const newsStatIndex = statKeys.indexOf("events");
 const emptyStats = statCards.map((item) => ({ ...item, value: "--" }));
+const noticeCategoryClasses = {
+  Urgent: "border-red-200 bg-red-50 text-red-700",
+  Academic: "border-amber-200 bg-amber-50 text-amber-700",
+  Event: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  General: "border-blue-200 bg-blue-50 text-blue-700"
+};
+function normalizeDepartmentName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
 
 function formatStatValue(value) {
   const numericValue = Number(value);
   return Number.isFinite(numericValue) ? numericValue.toLocaleString() : "--";
 }
 
-const heroTextVariants = {
-  hidden: { opacity: 0, y: 40 },
-  visible: (i) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: 0.3 + i * 0.15, duration: 0.7, ease: [0.16, 1, 0.3, 1] }
-  })
-};
-
-const fadeUpVariants = {
-  hidden: { opacity: 0, y: 30 },
-  visible: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.08, duration: 0.6, ease: [0.16, 1, 0.3, 1] }
-  })
-};
-
 function formatDate(value) {
   if (!value) return "Recently";
   return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
 }
 
+function noticeCategory(notice = {}) {
+  return noticeCategoryClasses[notice.category] ? notice.category : "General";
+}
+
+function noticePriority(notice = {}) {
+  const category = noticeCategory(notice);
+  return (category === "Urgent" ? 3 : 0) + (notice.pinned ? 2 : 0);
+}
+
+function ParallaxSection({ children, className = "", speed = 28 }) {
+  const ref = useRef(null);
+  const prefersReducedMotion = useReducedMotion();
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start end", "end start"]
+  });
+  const y = useTransform(scrollYProgress, [0, 1], prefersReducedMotion ? [0, 0] : [speed, -speed]);
+  const smoothY = useSpring(y, { stiffness: 90, damping: 26, mass: 0.35 });
+
+  return (
+    <section ref={ref} className={className}>
+      <motion.div style={{ y: smoothY }}>
+        {children}
+      </motion.div>
+    </section>
+  );
+}
+
+function CampusParallaxSection({ children }) {
+  const ref = useRef(null);
+  const prefersReducedMotion = useReducedMotion();
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start end", "end start"]
+  });
+  const backgroundY = useTransform(scrollYProgress, [0, 1], prefersReducedMotion ? [0, 0] : [-54, 54]);
+  const contentY = useTransform(scrollYProgress, [0, 1], prefersReducedMotion ? [0, 0] : [26, -26]);
+  const smoothBackgroundY = useSpring(backgroundY, { stiffness: 80, damping: 28, mass: 0.4 });
+  const smoothContentY = useSpring(contentY, { stiffness: 90, damping: 26, mass: 0.35 });
+
+  return (
+    <section ref={ref} className="relative isolate overflow-hidden py-24">
+      <motion.div
+        className="absolute -inset-x-8 -inset-y-28 bg-gradient-to-br from-[#1e293b] via-[#0f172a] to-[#0d6efd]/30 bg-cover bg-center will-change-transform"
+        style={{ y: smoothBackgroundY, scale: 1.08 }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#0f172a]/88 via-[#0f172a]/64 to-[#0d6efd]/42" />
+      <motion.div style={{ y: smoothContentY }} className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {children}
+      </motion.div>
+    </section>
+  );
+}
+
 export default function Home() {
-  const heroSection = useRef(null);
   const navigate = useNavigate();
-  const { scrollY } = useScroll();
   const [notices, setNotices] = useState([]);
   const [blogs, setBlogs] = useState([]);
+  const [publicCourses, setPublicCourses] = useState([]);
+  const [publicDepartments, setPublicDepartments] = useState([]);
+  const [blogsLoaded, setBlogsLoaded] = useState(false);
   const [liveStats, setLiveStats] = useState(emptyStats);
   const cmsPage = useCmsPage("home");
+  const facultiesCmsPage = useCmsPage("faculties");
   const { t, translate } = useLanguage();
   const cmsContent = cmsPage?.published || {};
+  const cmsDepartmentImageFallbacks = useMemo(() => {
+    const sections = (facultiesCmsPage?.published?.sections || []).filter((section) => section.visible !== false && section.imageUrl);
+    const byName = sections.reduce((images, section) => {
+      images[normalizeDepartmentName(section.title)] = section.imageUrl;
+      return images;
+    }, {});
+
+    return {
+      byName,
+      images: sections.map((section) => section.imageUrl)
+    };
+  }, [facultiesCmsPage]);
   const visibleCmsPage = useMemo(() => {
     if (!cmsPage?.published?.sections) return cmsPage;
 
@@ -71,13 +135,10 @@ export default function Home() {
   const hasCmsSections = (visibleCmsPage?.published?.sections || []).some((section) => section.visible !== false && (section.title || section.body || section.imageUrl || section.embedUrl));
   usePageSeo(cmsPage, "ATI Jaffna", "Empowering students through quality education.");
 
-  const openHeroLink = (link) => {
-    if (/^https?:\/\//i.test(link)) {
-      window.open(link, "_blank", "noopener,noreferrer");
-      return;
-    }
-    navigate(link);
-  };
+  useEffect(() => {
+    document.documentElement.classList.add("home-page-scrollbar-hidden");
+    return () => document.documentElement.classList.remove("home-page-scrollbar-hidden");
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -101,7 +162,12 @@ export default function Home() {
     apiFetch("/api/notices")
       .then((items) => {
         if (!active) return;
-        setNotices((Array.isArray(items) ? items : []).filter((notice) => !notice.audience || notice.audience === "all").slice(0, 3));
+        setNotices(
+          (Array.isArray(items) ? items : [])
+            .filter((notice) => !notice.audience || ["all", "students"].includes(notice.audience))
+            .sort((a, b) => noticePriority(b) - noticePriority(a) || new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+            .slice(0, 3)
+        );
       })
       .catch(() => {
         if (active) setNotices([]);
@@ -110,10 +176,32 @@ export default function Home() {
     apiFetch("/api/blogs")
       .then((items) => {
         if (!active) return;
-        setBlogs((Array.isArray(items) ? items : []).filter((blog) => blog.published !== false).slice(0, 3));
+        setBlogs((Array.isArray(items) ? items : []).filter((blog) => blog.published !== false));
+        setBlogsLoaded(true);
       })
       .catch(() => {
-        if (active) setBlogs([]);
+        if (active) {
+          setBlogs([]);
+          setBlogsLoaded(true);
+        }
+      });
+
+    apiFetch("/api/public/courses")
+      .then((items) => {
+        if (!active) return;
+        setPublicCourses(Array.isArray(items) ? items.slice(0, 3) : []);
+      })
+      .catch(() => {
+        if (active) setPublicCourses([]);
+      });
+
+    apiFetch("/api/public/departments")
+      .then((items) => {
+        if (!active) return;
+        setPublicDepartments(Array.isArray(items) ? items.slice(0, 3) : []);
+      })
+      .catch(() => {
+        if (active) setPublicDepartments([]);
       });
 
     return () => {
@@ -122,143 +210,83 @@ export default function Home() {
     };
   }, []);
 
-  // ── Parallax transforms ──
-  const heroImageY = useTransform(scrollY, [0, 800], [0, 280]);
-  const auroraY = useTransform(scrollY, [0, 800], [0, 120]);
-  const heroTextY = useTransform(scrollY, [0, 500], [0, -40]);
-  const heroOpacity = useTransform(scrollY, [0, 500], [1, 0.65]);
-  const campusBgY = useTransform(scrollY, [0, 600], [0, 120]);
+  const visibleBlogs = blogs.slice(0, 3);
+  const statsWithBlogCount = liveStats.map((item, index) =>
+    index === newsStatIndex ? { ...item, value: blogsLoaded ? formatStatValue(blogs.length) : "--" } : item
+  );
+  const departmentImage = (department, index) =>
+    department?.imageUrl ||
+    cmsDepartmentImageFallbacks.byName[normalizeDepartmentName(department?.name)] ||
+    cmsDepartmentImageFallbacks.images[index % cmsDepartmentImageFallbacks.images.length];
+  const currentHeroImage = cmsContent.heroImageUrl || heroBg;
+  const heroSlides = useMemo(
+    () => [
+      {
+        title: "Advanced Technological Institute Jaffna",
+        subtitle: translate(cmsContent.heroDescription) || t("home.heroText"),
+        image: currentHeroImage,
+        ctaText: "Explore Courses",
+        ctaLink: "/courses"
+      },
+      {
+        title: "Learn With Purpose",
+        subtitle: "Build practical skills, professional confidence, and a clear pathway into Sri Lanka's technology and industry sectors.",
+        image: currentHeroImage,
+        ctaText: "Student Portal",
+        ctaLink: "/login"
+      },
+      {
+        title: "A Campus For Tomorrow",
+        subtitle: "Discover programmes, announcements, student services, and ATI Jaffna updates in one connected digital experience.",
+        image: currentHeroImage,
+        ctaText: "Latest News",
+        ctaLink: "/news"
+      }
+    ],
+    [cmsContent.heroDescription, currentHeroImage, t, translate]
+  );
 
   return (
     <>
-      <section ref={heroSection} className="relative h-screen overflow-hidden">
-        <motion.div
-          className="hero-aurora absolute inset-0 z-10 opacity-70 will-change-transform"
-          style={{ y: auroraY }}
-        />
-        <motion.img
-          src={cmsContent.heroImageUrl || heroBg}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover will-change-transform"
-          style={{ scale: 1.08, y: heroImageY }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0f172a]/85 via-[#0f172a]/75 to-[#0f172a]/90" />
-        <div
-          onMouseMove={(e) => {
-            const rect = heroSection.current?.getBoundingClientRect();
-            if (!rect) return;
-            const x = (e.clientX / window.innerWidth - 0.5) * -6;
-            const y = (e.clientY / window.innerHeight - 0.5) * -6;
-            heroSection.current?.style.setProperty("--mx", `${x}px`);
-            heroSection.current?.style.setProperty("--my", `${y}px`);
-          }}
-          className="relative z-20 mx-auto flex h-screen max-w-7xl items-center px-4 pb-16 pt-32 sm:px-6 lg:px-8"
-        >
-          <motion.div className="max-w-3xl text-white" style={{ y: heroTextY, opacity: heroOpacity }}>
-            <motion.p
-              custom={0}
-              variants={heroTextVariants}
-              initial="hidden"
-              animate="visible"
-              className="mb-4 text-sm font-bold uppercase tracking-[0.28em] text-blue-200"
-            >
-              Sri Lanka Institute of Advanced Technological Education.
-            </motion.p>
-            <motion.h1
-              custom={1}
-              variants={heroTextVariants}
-              initial="hidden"
-              animate="visible"
-              className="text-shimmer text-5xl font-black leading-tight md:text-7xl"
-            >
-              Advanced Technological Institute Jaffna
-            </motion.h1>
-            <motion.p
-              custom={2}
-              variants={heroTextVariants}
-              initial="hidden"
-              animate="visible"
-              className="mt-5 max-w-2xl text-xl leading-8 text-slate-100"
-            >
-              {translate(cmsContent.heroDescription) || t("home.heroText")}
-            </motion.p>
-            <motion.div
-              custom={3}
-              variants={heroTextVariants}
-              initial="hidden"
-              animate="visible"
-              className="mt-8 flex flex-wrap gap-3"
-            >
-              <motion.button
-                onClick={() => openHeroLink(cmsContent.primaryButtonLink || "/courses")}
-                className="clay-btn-primary px-5"
-                whileHover={{ scale: 1.04, y: -2 }}
-                whileTap={{ scale: 0.97 }}
-              >
-                {translate(cmsContent.primaryButtonText) || t("common.viewCourses")}
-              </motion.button>
-              <motion.button
-                onClick={() => openHeroLink(cmsContent.secondaryButtonLink || "/courses")}
-                className="clay-btn-secondary"
-                whileHover={{ scale: 1.04, y: -2 }}
-                whileTap={{ scale: 0.97 }}
-              >
-                {translate(cmsContent.secondaryButtonText) || t("common.viewCourses")}
-              </motion.button>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
+      <HeroSlider slides={heroSlides} autoplay autoplayDelay={5000} />
 
-      <section className="-mt-20 px-4 pb-20 sm:px-6 lg:px-8">
+      <ParallaxSection className="px-4 py-20 sm:px-6 lg:px-8" speed={18}>
         <div className="relative mx-auto grid max-w-7xl gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          {liveStats.map((item, index) => {
+          {statsWithBlogCount.map((item, index) => {
             const Icon = icons[index];
             return (
-              <motion.div
+              <div
                 key={item.label}
-                variants={fadeUpVariants}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, margin: "-40px" }}
-                custom={index}
-                whileHover={{ y: -6, transition: { type: "spring", stiffness: 300, damping: 20 } }}
               >
                 <GlassCard className="group text-center">
                   <Icon className="mx-auto mb-4 text-clay-accent transition duration-300 group-hover:scale-110" size={30} />
                   <p className="text-3xl font-black text-clay-text">{item.value}</p>
                   <p className="mt-1 text-sm font-bold text-clay-muted">{item.label}</p>
                 </GlassCard>
-              </motion.div>
+              </div>
             );
           })}
         </div>
-      </section>
+      </ParallaxSection>
 
       {hasCmsSections && (
-        <section className="page-section pt-0">
+        <ParallaxSection className="page-section pt-0" speed={24}>
           <div className="mx-auto max-w-7xl">
             <CmsSections cmsPage={visibleCmsPage} />
           </div>
-        </section>
+        </ParallaxSection>
       )}
 
       {notices.length > 0 && (
-        <section className="page-section pt-0">
+        <ParallaxSection className="page-section pt-0" speed={28}>
           <div className="mx-auto max-w-7xl">
             <SectionHeader eyebrow={t("home.notices")} title={t("home.latestAnnouncements")} text={t("home.noticesText")} />
-            <motion.div
+            <div
               className="grid gap-5 md:grid-cols-3"
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: "-60px" }}
-              variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
             >
               {notices.map((notice, index) => (
-                <motion.article
+                <article
                   key={notice._id || `${notice.title}-${index}`}
-                  variants={fadeUpVariants}
-                  whileHover={{ y: -6, transition: { type: "spring", stiffness: 300, damping: 20 } }}
                 >
                   <GlassCard className="h-full">
                     <div className="mb-4 flex items-center justify-between gap-3">
@@ -267,109 +295,94 @@ export default function Home() {
                       </span>
                       <span className="text-xs font-bold uppercase tracking-[0.14em] text-clay-muted">{formatDate(notice.createdAt)}</span>
                     </div>
+                    <span className={`mb-3 inline-flex w-fit items-center rounded-full border px-3 py-1 text-xs font-black ${noticeCategoryClasses[noticeCategory(notice)]}`}>
+                      {noticeCategory(notice) === "Event" ? "Events" : noticeCategory(notice)}
+                    </span>
                     <h3 className="text-xl font-black text-clay-text">{notice.title}</h3>
                     <p className="mt-3 text-sm leading-6 text-clay-muted">{notice.body}</p>
                   </GlassCard>
-                </motion.article>
+                </article>
               ))}
-            </motion.div>
+            </div>
           </div>
-        </section>
+        </ParallaxSection>
       )}
 
-      <section className="relative isolate overflow-hidden py-24">
-        <motion.div
-          className="absolute -inset-x-8 -inset-y-20 bg-gradient-to-br from-[#1e293b] via-[#0f172a] to-[#0d6efd]/30 bg-cover bg-center will-change-transform"
-          style={{ scale: 1.05, y: campusBgY }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0f172a]/88 via-[#0f172a]/64 to-[#0d6efd]/42" />
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <motion.div
+      <CampusParallaxSection>
+          <div
             className="max-w-2xl text-white"
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
           >
             <p className="text-sm font-bold uppercase tracking-[0.24em] text-blue-200">{t("home.campusLife")}</p>
             <h2 className="mt-3 text-3xl font-black md:text-5xl">{t("home.campusTitle")}</h2>
             <p className="mt-5 text-base leading-7 text-slate-100">{t("home.campusText")}</p>
-          </motion.div>
-        </div>
-      </section>
+          </div>
+      </CampusParallaxSection>
 
-      <section className="page-section pt-0">
+      <ParallaxSection className="page-section pt-0" speed={24}>
         <div className="mx-auto max-w-7xl">
           <SectionHeader eyebrow={t("home.pathways")} title={t("home.popularCourses")} text={t("home.coursesText")} />
-          <motion.div
+          <div
             className="grid gap-5 md:grid-cols-3"
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-60px" }}
-            variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
           >
-            {courses.slice(0, 3).map((course) => (
-              <motion.div
-                key={course.title}
-                variants={fadeUpVariants}
-                whileHover={{ y: -6, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+            {publicCourses.map((course) => (
+              <div
+                key={course._id || course.title}
               >
                 <GlassCard className="group">
                   <h3 className="text-xl font-black text-clay-text">{course.title}</h3>
-                  <p className="mt-3 text-sm text-clay-muted">{course.duration} | {course.requirements}</p>
-                  <button onClick={() => navigate("/courses")} className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-clay-accent transition group-hover:gap-3">
+                  <p className="mt-3 text-sm text-clay-muted">
+                    {[course.duration, course.entryRequirements].filter(Boolean).join(" | ") || "Course details will be updated soon."}
+                  </p>
+                  <a href="/courses" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-clay-accent transition group-hover:gap-3">
                     {t("common.viewCourses")} <ArrowRight size={16} />
-                  </button>
+                  </a>
                 </GlassCard>
-              </motion.div>
+              </div>
             ))}
-          </motion.div>
+          </div>
         </div>
-      </section>
+      </ParallaxSection>
 
-      <section className="page-section bg-clay-card/60">
+      <ParallaxSection className="page-section bg-clay-card/60" speed={22}>
         <div className="mx-auto max-w-7xl">
           <SectionHeader eyebrow={t("home.departments")} title={t("home.communities")} text={t("home.departmentsText")} />
-          <motion.div
+          <div
             className="grid gap-5 md:grid-cols-3"
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-60px" }}
-            variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
           >
-            {departments.slice(0, 3).map((department) => (
-              <motion.article
-                key={department.title}
-                variants={fadeUpVariants}
-                whileHover={{ y: -6, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+            {publicDepartments.map((department, index) => (
+              <article
+                key={department._id || department.name}
                 className="clay-image-card group"
               >
-                <img src={department.image} alt="" className="h-48 w-full object-cover transition duration-700 group-hover:scale-110" />
+                {departmentImage(department, index) ? (
+                  <img src={departmentImage(department, index)} alt="" className="h-48 w-full object-cover transition duration-700 group-hover:scale-110" />
+                ) : (
+                  <div className="flex h-48 w-full items-center justify-center bg-slate-100 text-clay-accent">
+                    <GraduationCap size={40} />
+                  </div>
+                )}
                 <div className="grow p-5">
-                  <h3 className="text-lg font-black text-clay-text">{department.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-clay-muted">{department.description}</p>
+                  <h3 className="text-lg font-black text-clay-text">{department.name}</h3>
+                  <p className="mt-2 text-sm leading-6 text-clay-muted">
+                    {department.description || "Department details will be updated by ATI Jaffna staff."}
+                  </p>
                 </div>
-              </motion.article>
+              </article>
             ))}
-          </motion.div>
+          </div>
         </div>
-      </section>
+      </ParallaxSection>
 
-      <section className="page-section">
+      <ParallaxSection className="page-section" speed={20}>
         <div className="mx-auto max-w-7xl">
           <SectionHeader eyebrow={t("home.news")} title={t("home.events")} text={t("home.eventsText")} />
-          <motion.div
+          <div
             className="grid gap-5 md:grid-cols-3"
-            initial="hidden"
-            animate="visible"
-            variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
           >
-            {blogs.length > 0 ? (
-              blogs.map((blog) => (
-                <motion.article
+            {visibleBlogs.length > 0 ? (
+              visibleBlogs.map((blog) => (
+                <article
                   key={blog._id || blog.title}
-                  variants={fadeUpVariants}
-                  whileHover={{ y: -6, transition: { type: "spring", stiffness: 300, damping: 20 } }}
                   className="clay-image-card group"
                 >
                   {blog.imageUrl ? (
@@ -390,7 +403,7 @@ export default function Home() {
                       {t("common.readBlog")} <ArrowRight size={16} />
                     </button>
                   </div>
-                </motion.article>
+                </article>
               ))
             ) : (
               <div className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm md:col-span-3">
@@ -399,9 +412,9 @@ export default function Home() {
                 <p className="mt-2 text-sm text-clay-muted">{t("common.noBlogsHint")}</p>
               </div>
             )}
-          </motion.div>
+          </div>
         </div>
-      </section>
+      </ParallaxSection>
     </>
   );
 }

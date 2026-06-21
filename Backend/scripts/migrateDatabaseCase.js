@@ -1,7 +1,7 @@
 import { MongoClient } from "mongodb";
 
-const sourceName = "ATI_JAFFNA";
-const targetName = "ATI_Jaffna";
+const sourceName = "ATI_Jaffna";
+const targetName = "ATI_JAFFNA";
 const backupName = `${targetName}_CASE_BACKUP_${new Date().toISOString().replace(/[-:.TZ]/g, "")}`;
 const client = new MongoClient("mongodb://127.0.0.1:27017");
 

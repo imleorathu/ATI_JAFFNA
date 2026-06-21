@@ -79,7 +79,7 @@ export const dashboardItems = [
   "My Courses",
   "Timetable",
   "Notices",
-  "Exam Results",
+  "Grade Results",
   "Assignment Upload",
   "Payment Status"
 ];
@@ -139,15 +139,6 @@ export const gradeData = [
   { subject: "Information Systems", grade: "B+", credits: 3, score: 78, semester: 1 }
 ];
 
-export const examSchedule = [
-  { subject: "Advanced Web Development", date: "2026-05-15", time: "09:00 AM", duration: "3 hours", room: "Lab 3", type: "Practical" },
-  { subject: "Database Management Systems", date: "2026-05-18", time: "09:00 AM", duration: "3 hours", room: "Hall A", type: "Written" },
-  { subject: "Software Engineering", date: "2026-05-20", time: "01:00 PM", duration: "2 hours", room: "Hall B", type: "Written" },
-  { subject: "Computer Networks", date: "2026-05-22", time: "09:00 AM", duration: "3 hours", room: "Lab 2", type: "Practical" },
-  { subject: "Object-Oriented Programming", date: "2026-05-25", time: "09:00 AM", duration: "3 hours", room: "Lab 1", type: "Practical" },
-  { subject: "Project Management", date: "2026-05-28", time: "01:00 PM", duration: "2 hours", room: "Hall A", type: "Written" }
-];
-
 export const assignments = [
   { id: 1, title: "E-Commerce Website Development", subject: "Advanced Web Development", dueDate: "2026-04-20", status: "submitted", marks: 42, totalMarks: 50, description: "Build a fully functional e-commerce site using React and Node.js" },
   { id: 2, title: "Database Normalization Report", subject: "Database Management Systems", dueDate: "2026-04-25", status: "pending", marks: 0, totalMarks: 40, description: "Analyse and normalise a given relational database to 3NF" },
@@ -159,7 +150,7 @@ export const assignments = [
 
 export const notifications = [
   { id: 1, title: "Assignment Reminder", message: "Database Normalization Report is due on April 25th.", type: "warning", time: "2 hours ago", read: false },
-  { id: 2, title: "Exam Schedule Published", message: "Final exam timetable for Semester 3 is now available.", type: "info", time: "1 day ago", read: false },
+  { id: 2, title: "Timetable Updated", message: "Semester 3 class timetable has been updated.", type: "info", time: "1 day ago", read: false },
   { id: 3, title: "Fee Payment", message: "Your semester fee payment has been confirmed. Thank you!", type: "success", time: "3 days ago", read: true },
   { id: 4, title: "Class Cancelled", message: "Computer Networks class on Friday is cancelled due to staff meeting.", type: "error", time: "4 days ago", read: true },
   { id: 5, title: "Library Notice", message: "Books borrowed on March 1st are due for return.", type: "info", time: "1 week ago", read: true },
@@ -251,40 +242,7 @@ export const chatMessages = [
   { id: 5, sender: "Mr. P. Raveendran", message: "Reminder: SRS document submission is next week.", time: "01:15 PM", type: "lecturer" },
   { id: 6, sender: "Niroshan K.", message: "Anyone formed a group for the SE project?", time: "02:00 PM", type: "student" },
   { id: 7, sender: "Yalini S.", message: "Yes, we need one more member. Interested?", time: "02:05 PM", type: "student" },
-  { id: 8, sender: "System", message: "Exam timetable for Semester 3 has been published.", time: "03:00 PM", type: "system" }
-];
-
-export const quizData = [
-  {
-    id: 1, title: "HTML & CSS Basics", subject: "Advanced Web Development", duration: 15, totalQuestions: 10,
-    questions: [
-      { id: 1, question: "What does HTML stand for?", options: ["Hyper Text Markup Language", "High Tech Modern Language", "Hyper Transfer Markup Language", "Home Tool Markup Language"], correctAnswer: 0 },
-      { id: 2, question: "Which CSS property controls the text size?", options: ["font-style", "text-size", "font-size", "text-style"], correctAnswer: 2 },
-      { id: 3, question: "What is the correct HTML for creating a hyperlink?", options: ["<link>", "<a>", "<href>", "<url>"], correctAnswer: 1 },
-      { id: 4, question: "Which property is used to change the background color?", options: ["background-color", "color", "bgcolor", "bg-color"], correctAnswer: 0 },
-      { id: 5, question: "What does CSS stand for?", options: ["Cascading Style Sheets", "Computer Style Sheets", "Creative Style System", "Colorful Style Sheets"], correctAnswer: 0 },
-      { id: 6, question: "Which HTML tag is used for inserting an image?", options: ["<image>", "<img>", "<pic>", "<src>"], correctAnswer: 1 },
-      { id: 7, question: "What is the default display of a <div> element?", options: ["inline", "block", "inline-block", "flex"], correctAnswer: 1 },
-      { id: 8, question: "Which attribute specifies the URL for an anchor tag?", options: ["src", "link", "href", "ref"], correctAnswer: 2 },
-      { id: 9, question: "Which CSS property makes text bold?", options: ["font-weight", "text-bold", "font-style", "bold"], correctAnswer: 0 },
-      { id: 10, question: "What is the correct HTML for an ordered list?", options: ["<ul>", "<li>", "<ol>", "<list>"], correctAnswer: 2 }
-    ]
-  },
-  {
-    id: 2, title: "SQL Fundamentals", subject: "Database Management Systems", duration: 20, totalQuestions: 10,
-    questions: [
-      { id: 1, question: "What does SQL stand for?", options: ["Structured Query Language", "Simple Query Language", "Standard Query Language", "Sequential Query Language"], correctAnswer: 0 },
-      { id: 2, question: "Which SQL statement is used to retrieve data?", options: ["GET", "FETCH", "SELECT", "EXTRACT"], correctAnswer: 2 },
-      { id: 3, question: "Which clause is used to filter records?", options: ["WHERE", "FILTER", "HAVING", "MATCH"], correctAnswer: 0 },
-      { id: 4, question: "What is the primary key?", options: ["A unique identifier for a record", "A foreign key", "An indexed column", "A composite field"], correctAnswer: 0 },
-      { id: 5, question: "Which JOIN returns all records from the left table?", options: ["INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN"], correctAnswer: 1 },
-      { id: 6, question: "What does the COUNT() function do?", options: ["Counts rows", "Counts columns", "Sums values", "Averages values"], correctAnswer: 0 },
-      { id: 7, question: "Which command deletes a table?", options: ["DELETE TABLE", "DROP TABLE", "REMOVE TABLE", "CLEAR TABLE"], correctAnswer: 1 },
-      { id: 8, question: "What is a foreign key?", options: ["A key referencing another table's primary key", "A unique key", "A primary key", "An alternate key"], correctAnswer: 0 },
-      { id: 9, question: "What is normalization?", options: ["Reducing data redundancy", "Increasing data size", "Deleting data", "Encrypting data"], correctAnswer: 0 },
-      { id: 10, question: "Which statement is used to add new records?", options: ["INSERT INTO", "ADD RECORD", "INSERT NEW", "APPEND"], correctAnswer: 0 }
-    ]
-  }
+  { id: 8, sender: "System", message: "Semester 3 class timetable has been updated.", time: "03:00 PM", type: "system" }
 ];
 
 export const lmsCourses = [

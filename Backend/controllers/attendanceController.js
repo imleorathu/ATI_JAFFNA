@@ -5,6 +5,7 @@ import User from "../models/User.js";
 import { getDepartmentScope } from "../middleware/departmentAccess.js";
 
 const facultyScope = getDepartmentScope;
+const departmentStaffRoles = ["lecturer", "department_staff"];
 const campusLatitude = Number(process.env.ATI_CAMPUS_LAT || 9.651841);
 const campusLongitude = Number(process.env.ATI_CAMPUS_LNG || 80.023445);
 const allowedRadiusMeters = Number(process.env.ATTENDANCE_RADIUS_METERS || 500);
@@ -223,7 +224,7 @@ export async function listAttendanceRecords(req, res, next) {
       const scope = await studentScope(req);
       if (scope.error) return res.status(403).json({ message: scope.error });
       query.student = scope.student._id;
-    } else if (req.user?.role === "lecturer") {
+    } else if (departmentStaffRoles.includes(req.user?.role)) {
       const scope = await facultyScope(req);
       if (scope.error) return res.status(403).json({ message: scope.error });
       query.department = scope.department;

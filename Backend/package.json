@@ -7,6 +7,7 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "seed:departments": "node scripts/seedDepartments.js",
+    "seed:courses": "node scripts/seedCourses.js",
     "seed:test-students": "node scripts/seedTestStudents.js",
     "migrate:role-profiles": "node scripts/migrateRoleProfiles.js",
     "sync:staff-profiles": "node scripts/syncStaffProfiles.js",
@@ -14,6 +15,7 @@
     "seed:part-time-fees": "node scripts/seedPartTimeFees.js",
     "test:department-access": "node --test tests/departmentAccess.test.js",
     "test:fee-access": "node --test tests/feeAccess.test.js",
+    "test:notice-audience": "node --test tests/noticeAudience.test.js",
     "db:migrate-case": "node scripts/migrateDatabaseCase.js",
     "db:indexes": "node models/indexes.js"
   },

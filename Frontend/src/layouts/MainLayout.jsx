@@ -64,16 +64,6 @@ const rgbaMix = (from, to, progress) => {
   return `rgba(${mix(from[0], to[0], eased)}, ${mix(from[1], to[1], eased)}, ${mix(from[2], to[2], eased)}, ${mixAlpha(from[3], to[3], eased)})`;
 };
 
-const containerVariants = {
-  hidden: { opacity: 0, y: -24, scale: 0.96 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] }
-  }
-};
-
 const navItemVariants = {
   hidden: { opacity: 0, y: -8 },
   visible: (i) => ({
@@ -102,6 +92,7 @@ const mobileMenuVariants = {
 export default function MainLayout() {
   const [open, setOpen] = useState(false);
   const [homeNavProgress, setHomeNavProgress] = useState(1);
+  const [hasScrolledHome, setHasScrolledHome] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuth();
@@ -127,6 +118,7 @@ export default function MainLayout() {
 
   const isHomePage = location.pathname === "/";
   const isAuthPage = ["/login", "/register"].some((path) => location.pathname === path);
+  const isNavbarVisible = !isHomePage || hasScrolledHome;
 
   const navbarStyle = useMemo(() => {
     if (!isHomePage) return undefined;
@@ -135,15 +127,15 @@ export default function MainLayout() {
     const isDarkTheme = themeMode === "dark";
     const heroPalette = isDarkTheme
       ? {
-          bg: [255, 255, 255, 0.9],
-          border: [15, 23, 42, 0.1],
-          text: [2, 6, 23, 1],
-          muted: [2, 6, 23, 0.9],
-          hover: [15, 23, 42, 0.06],
-          controlBg: [15, 23, 42, 0.03],
-          logoBorder: [15, 23, 42, 0.12],
-          shadowAlpha: 0.16,
-          active: [26, 115, 232, 1]
+          bg: [2, 6, 23, 0.78],
+          border: [125, 211, 252, 0.18],
+          text: [248, 250, 252, 1],
+          muted: [226, 232, 240, 0.88],
+          hover: [255, 255, 255, 0.1],
+          controlBg: [255, 255, 255, 0.06],
+          logoBorder: [125, 211, 252, 0.24],
+          shadowAlpha: 0.28,
+          active: [125, 211, 252, 1]
         }
       : {
           bg: [2, 6, 23, 0.72],
@@ -194,6 +186,11 @@ export default function MainLayout() {
     };
   }, [homeNavProgress, isHomePage, themeMode]);
 
+  const headerStyle = useMemo(() => ({
+    ...(navbarStyle || {}),
+    pointerEvents: isNavbarVisible ? "auto" : "none"
+  }), [isNavbarVisible, navbarStyle]);
+
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
@@ -201,25 +198,36 @@ export default function MainLayout() {
 
   useEffect(() => {
     const isHomePage = location.pathname === "/";
-    const updateNavbarMode = () => {
-      if (!isHomePage) {
-        setHomeNavProgress(1);
-        return;
-      }
+    let frameId = 0;
+
+    const calculateProgress = () => {
+      if (!isHomePage) return 1;
 
       const transitionLength = Math.min(340, window.innerHeight * 0.32);
       const transitionStart = window.innerHeight - transitionLength;
-      const nextProgress = clamp((window.scrollY - transitionStart) / transitionLength);
-      setHomeNavProgress(nextProgress);
+      return clamp((window.scrollY - transitionStart) / transitionLength);
+    };
+
+    const updateNavbarMode = () => {
+      frameId = 0;
+      const nextProgress = calculateProgress();
+      setHasScrolledHome(!isHomePage || window.scrollY > 12);
+      setHomeNavProgress((current) => (Math.abs(current - nextProgress) < 0.005 ? current : nextProgress));
+    };
+
+    const scheduleUpdate = () => {
+      if (frameId) return;
+      frameId = window.requestAnimationFrame(updateNavbarMode);
     };
 
     updateNavbarMode();
-    window.addEventListener("scroll", updateNavbarMode, { passive: true });
-    window.addEventListener("resize", updateNavbarMode);
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
 
     return () => {
-      window.removeEventListener("scroll", updateNavbarMode);
-      window.removeEventListener("resize", updateNavbarMode);
+      if (frameId) window.cancelAnimationFrame(frameId);
+      window.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
     };
   }, [location.pathname]);
 
@@ -237,11 +245,15 @@ export default function MainLayout() {
   return (
     <div className="app-shell min-h-screen text-clay-text">
       <motion.header
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
+        initial={{ opacity: 0, y: -24, scale: 0.96 }}
+        animate={{
+          opacity: isNavbarVisible ? 1 : 0,
+          y: isNavbarVisible ? 0 : -28,
+          scale: isNavbarVisible ? 1 : 0.96
+        }}
+        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
         className={`site-clean-navbar fixed inset-x-0 top-0 z-50 ${isHomePage ? "home-hero-navbar" : ""}`}
-        style={navbarStyle}
+        style={headerStyle}
       >
         <motion.nav
           className="site-clean-nav mx-auto flex max-w-7xl items-center gap-5 px-5 sm:px-7 lg:px-8"
@@ -295,9 +307,11 @@ export default function MainLayout() {
               onClick={toggleTheme}
               aria-label={themeMode === "dark" ? t("theme.switchLight") : t("theme.switchDark")}
               aria-pressed={themeMode === "dark"}
-              className="site-clean-icon-button"
+              className="site-clean-icon-button site-theme-toggle-glass"
             >
-              {themeMode === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+              <span className="site-theme-toggle-glass-icon">
+                {themeMode === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+              </span>
             </button>
             {accountItems.map((item) => {
               const ButtonIcon = item.icon;
@@ -366,10 +380,13 @@ export default function MainLayout() {
                 <button
                   type="button"
                   onClick={toggleTheme}
+                  aria-label={themeMode === "dark" ? t("theme.switchLight") : t("theme.switchDark")}
                   aria-pressed={themeMode === "dark"}
-                  className="site-theme-toggle site-theme-toggle-mobile"
+                  className="site-theme-toggle site-theme-toggle-mobile site-theme-toggle-glass-mobile"
                 >
-                  {themeMode === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+                  <span className="site-theme-toggle-glass-icon">
+                    {themeMode === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+                  </span>
                   <span>{themeMode === "dark" ? t("theme.switchLight") : t("theme.switchDark")}</span>
                 </button>
                 <div className="grid gap-2">

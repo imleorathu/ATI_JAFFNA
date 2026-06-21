@@ -798,7 +798,7 @@ function StudentFeesPortal({ dashboard, feeRows, payments, invoices, receipts, r
   const feeBreakdown = [
     ["Registration Fee", "Registration"],
     ["Course Fee", "Course"],
-    ["Exam Fee", "Exam"],
+    ["Assessment Fee", "Assessment"],
     ["Library Fee", "Library"],
     ["Hostel Fee", "Hostel"],
     ["Certificate Fee", "Certificate"],
@@ -816,7 +816,7 @@ function StudentFeesPortal({ dashboard, feeRows, payments, invoices, receipts, r
     ["No Due Certificate", totalDue <= 0 ? "eligible" : "pending"],
     ["Department Clearance", totalDue <= 0 ? "cleared" : "pending"],
     ["Graduation Clearance", totalDue <= 0 ? "cleared" : "pending"],
-    ["Exam Eligibility", overdueFees.length ? "blocked" : "eligible"]
+    ["Academic Eligibility", overdueFees.length ? "blocked" : "eligible"]
   ];
 
   const openPaymentPortal = (fee) => {

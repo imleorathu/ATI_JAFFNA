@@ -58,7 +58,7 @@ const paymentLabels = {
 export default function StudentManagement() {
   const { confirm } = useModal();
   const { user } = useAuth();
-  const isFaculty = String(user?.role || "").toLowerCase() === "lecturer";
+  const isFaculty = ["lecturer", "department_staff"].includes(String(user?.role || "").toLowerCase());
   const [students, setStudents] = useState([]);
   const [departments, setDepartments] = useState(fallbackDepartments);
   const [facultyScope, setFacultyScope] = useState(null);

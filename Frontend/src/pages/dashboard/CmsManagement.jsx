@@ -8,7 +8,6 @@ const baseEditablePages = [
   ["home", "Home"],
   ["about", "About"],
   ["faculties", "Faculties"],
-  ["courses", "Courses"],
   ["news", "News"],
   ["contact", "Contact"]
 ];
@@ -51,7 +50,6 @@ const sectionLayouts = [
 const sectionTemplates = [
   ["blank", "Blank section", {}],
   ["announcement", "Announcement", { type: "banner", layout: "wide", eyebrow: "Announcement", title: "Important Update", body: "Write the announcement details here." }],
-  ["course", "Course card", { type: "card", layout: "grid", eyebrow: "Course", title: "Course Title", body: "Duration, entry requirements, fees, and description.", buttonText: "Contact", buttonLink: "/contact" }],
   ["staff", "Staff profile", { type: "feature", layout: "split", eyebrow: "Faculty", title: "Staff Member Name", body: "Designation, department, qualifications, and contact details." }],
   ["faq", "FAQ", { type: "card", layout: "compact", eyebrow: "FAQ", title: "Question", body: "Answer the common question here." }],
   ["quote", "Principal message", { type: "quote", layout: "wide", eyebrow: "Message", title: "Principal / Director Message", body: "Add the message text here.", textAlign: "center" }],

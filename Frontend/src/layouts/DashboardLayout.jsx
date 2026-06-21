@@ -61,12 +61,10 @@ const roleNavLinks = {
   Faculty: [
     { to: "", label: "Dashboard", icon: LayoutDashboard, end: true },
     { to: "students", label: "Students", icon: GraduationCap },
-    { to: "my-classes", label: "My Classes", icon: BookOpen },
     { to: "timetable", label: "Timetable", icon: CalendarCheck },
     { to: "attendance", label: "Attendance", icon: FileText },
     { to: "grades", label: "Grades", icon: BarChart3 },
     { to: "assignments", label: "Assignments", icon: FileText },
-    { to: "exams", label: "Exams", icon: FileText },
     { to: "ai-assistant", label: "AI Assistant", icon: Bot },
     { to: "messages", label: "Messages", icon: MessageSquare }
   ],
@@ -75,6 +73,7 @@ const roleNavLinks = {
     { to: "users", label: "User Approvals", icon: UserCog },
     { to: "students", label: "Student Management", icon: GraduationCap },
     { to: "faculty", label: "Faculty Management", icon: User },
+    { to: "courses", label: "Course Management", icon: BookOpen },
     { to: "grades", label: "Grade Management", icon: BarChart3 },
     { to: "fees", label: "Part-Time Fees", icon: Wallet },
     { to: "messages", label: "Admin Messages", icon: MessageSquare },
@@ -163,7 +162,8 @@ export default function DashboardLayout({ user, children }) {
   const navigate = useNavigate();
   const { logout } = useAuth();
 
-  const role = roleLabels[String(user?.role || "student").toLowerCase()] || "Student";
+  const normalizedRole = String(user?.role || "student").toLowerCase();
+  const role = roleLabels[normalizedRole] || "Student";
   const navLinks = roleNavLinks[role] || roleNavLinks.Student;
   const basePath = roleBasePaths[role] || "/student";
   const displayName = user?.name || user?.email || "User";

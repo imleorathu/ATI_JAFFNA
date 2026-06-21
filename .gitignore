@@ -3,6 +3,8 @@ node_modules/
 .mongodb-log/
 uploads/
 .env
+secrets/
+Backend/secrets/
 Backend/backend-run.*.log
 *.log
 dist/

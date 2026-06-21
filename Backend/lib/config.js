@@ -3,7 +3,7 @@ import logger from "./logger.js";
 const REQUIRED_VARS = ["JWT_SECRET"];
 const OPTIONAL_VARS = {
   PORT: "5000",
-  MONGODB_URI: "mongodb://127.0.0.1:27017/ATI_Jaffna",
+  MONGODB_URI: "mongodb://127.0.0.1:27017/ATI_JAFFNA",
   CLIENT_URL: "http://127.0.0.1:5173",
   NODE_ENV: "development",
   LOG_LEVEL: undefined,

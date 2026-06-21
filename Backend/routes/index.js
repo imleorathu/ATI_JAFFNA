@@ -6,13 +6,13 @@ import Course from "../models/Course.js";
 import Department from "../models/Department.js";
 import Event from "../models/Event.js";
 import Faculty from "../models/Faculty.js";
-import Notice from "../models/Notice.js";
 import Student from "../models/Student.js";
 import TimetableEntry from "../models/TimetableEntry.js";
 import { listMyDepartmentStudents, listTimetableLecturers } from "../controllers/facultyStudentController.js";
 import { requireAuth } from "../middleware/auth.js";
 import assignmentRoutes from "./assignmentRoutes.js";
 import attendanceRoutes from "./attendanceRoutes.js";
+import formRoutes from "./formRoutes.js";
 import aiRoutes from "./aiRoutes.js";
 import authRoutes from "./authRoutes.js";
 import contactRoutes from "./contactRoutes.js";
@@ -20,6 +20,7 @@ import gradeRoutes from "./gradeRoutes.js";
 import resourceRoutes from "./resourceRoutes.js";
 import settingsRoutes from "./settingsRoutes.js";
 import pageContentRoutes from "./pageContentRoutes.js";
+import noticeRoutes from "./noticeRoutes.js";
 import partTimeFeesRoutes from "./partTimeFeesRoutes.js";
 import portalDataRoutes from "./portalDataRoutes.js";
 import userRoutes from "./userRoutes.js";
@@ -99,6 +100,19 @@ router.get("/public/departments", async (_req, res, next) => {
     );
 
     res.json(departmentsWithStats);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/public/courses", async (_req, res, next) => {
+  try {
+    const courses = await Course.find()
+      .select(publicCourseFields)
+      .sort({ department: 1, title: 1 })
+      .lean();
+
+    res.json(courses);
   } catch (error) {
     next(error);
   }
@@ -212,6 +226,7 @@ router.use("/settings", settingsRoutes);
 router.use("/ai", aiRoutes);
 router.use("/assignments", assignmentRoutes);
 router.use("/attendance", attendanceRoutes);
+router.use("/forms", formRoutes);
 router.use("/grades", gradeRoutes);
 router.use("/users", userRoutes);
 router.get("/students/my-department", requireAuth, listMyDepartmentStudents);
@@ -222,7 +237,7 @@ router.use("/courses", resourceRoutes(Course, { protectedRead: true }));
 router.use("/timetable", resourceRoutes(TimetableEntry, { protectedRead: true }));
 router.use("/departments", resourceRoutes(Department));
 router.use("/blogs", resourceRoutes(Blog));
-router.use("/notices", resourceRoutes(Notice));
+router.use("/notices", noticeRoutes);
 router.use("/events", resourceRoutes(Event));
 router.use("/applications", resourceRoutes(Application, { protectedRead: true }));
 router.use("/contacts", contactRoutes);

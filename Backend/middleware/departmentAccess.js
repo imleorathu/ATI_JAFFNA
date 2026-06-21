@@ -27,7 +27,7 @@ export function authorizeDepartmentAccess(getResourceDepartment) {
   return async (req, res, next) => {
     try {
       if (req.user?.role === "admin") return next();
-      if (req.user?.role !== "lecturer") return res.status(403).json({ message: "Admin or faculty access required." });
+      if (!departmentScopedRoles.includes(req.user?.role)) return res.status(403).json({ message: "Admin or faculty access required." });
 
       const scope = await getDepartmentScope(req);
       if (scope?.error) return res.status(403).json({ message: scope.error });

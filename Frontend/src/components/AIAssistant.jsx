@@ -37,6 +37,48 @@ const quickPrompts = [
   "Prepare me for an internship interview"
 ];
 
+const staffQuickPrompts = [
+  "Show all assignments due next week",
+  "Which students have attendance below 80%?",
+  "Find the university leave policy",
+  "What is the attendance requirement for course completion?",
+  "Create an assignment brief with a rubric",
+  "Generate quiz questions for my next class",
+  "Which course has the lowest submission rate?",
+  "Show attendance trends for Semester 4",
+  "Find students at risk of failure",
+  "Draft an announcement for missing submissions",
+  "Summarize this uploaded policy document",
+  "Generate a department attendance report"
+];
+
+const staffCapabilityCards = [
+  {
+    title: "Policy & RAG Search",
+    description: "Ask policy questions with document-backed source references.",
+    prompt: "What is the attendance requirement for course completion?",
+    Icon: BookOpen
+  },
+  {
+    title: "Teaching Builder",
+    description: "Draft assignments, rubrics, quizzes, lab work, and model answers.",
+    prompt: "Create an assignment brief with a rubric",
+    Icon: FileText
+  },
+  {
+    title: "Analytics & Risk",
+    description: "Find low attendance, weak performance, and submission patterns.",
+    prompt: "Find students at risk of failure",
+    Icon: Database
+  },
+  {
+    title: "Communication Drafts",
+    description: "Generate announcements, emails, reminders, and meeting notes.",
+    prompt: "Draft an announcement for missing submissions",
+    Icon: MessageSquare
+  }
+];
+
 const studentFloatingPrompts = [
   "What should I focus on today?",
   "Build a personalized study plan",
@@ -55,6 +97,15 @@ const starterMessage = {
   sender: "bot",
   text: "Hi! I am **ATI Buddy Pro**, your personalized student copilot. I can help like a ChatGPT-style university assistant: study planning, timetable questions, attendance risks, GPA progress, assignments, uploaded notes, coding help, career preparation, and next-step guidance from your portal context. What should we work on first?"
 };
+
+const staffStarterMessage = {
+  id: "staff-starter",
+  sender: "bot",
+  text: "Hi! I am **ATI Buddy Pro**, your staff portal AI assistant. I can search department records, assignment data, attendance marks, student performance, staff knowledge files, and uploaded university documents. Ask me for policy answers with sources, assignment/rubric drafts, quiz questions, analytics insights, at-risk student lists, announcements, emails, reports, or document summaries."
+};
+
+const studentDefaultMessages = [starterMessage];
+const staffDefaultMessages = [staffStarterMessage];
 
 const publicStarterMessage = {
   id: "public-starter",
@@ -130,7 +181,7 @@ export default function AIAssistant() {
   return isPortalPage ? <AIAssistantPage /> : <FloatingAssistant />;
 }
 
-function readChatHistory(historyKey, defaultMessages = [starterMessage]) {
+function readChatHistory(historyKey, defaultMessages = studentDefaultMessages) {
   try {
     return JSON.parse(localStorage.getItem(historyKey) || "null") || defaultMessages;
   } catch {
@@ -138,16 +189,16 @@ function readChatHistory(historyKey, defaultMessages = [starterMessage]) {
   }
 }
 
-function useRagChat(activeDocumentId = "", userKey = "guest") {
+function useRagChat(activeDocumentId = "", userKey = "guest", defaultMessages = studentDefaultMessages) {
   const historyKey = `atiAiHistory:${userKey}:${activeDocumentId || "general"}`;
   const [activeHistoryKey, setActiveHistoryKey] = useState(historyKey);
-  const [messages, setMessages] = useState(() => readChatHistory(historyKey));
+  const [messages, setMessages] = useState(() => readChatHistory(historyKey, defaultMessages));
   const [isTyping, setIsTyping] = useState(false);
 
   useEffect(() => {
     setActiveHistoryKey(historyKey);
-    setMessages(readChatHistory(historyKey));
-  }, [historyKey]);
+    setMessages(readChatHistory(historyKey, defaultMessages));
+  }, [defaultMessages, historyKey]);
 
   useEffect(() => {
     if (activeHistoryKey !== historyKey) return;
@@ -207,7 +258,7 @@ function useRagChat(activeDocumentId = "", userKey = "guest") {
 
   const clearHistory = () => {
     localStorage.removeItem(historyKey);
-    setMessages([starterMessage]);
+    setMessages(defaultMessages);
   };
   return { messages, setMessages, isTyping, sendMessage, clearHistory };
 }
@@ -421,10 +472,12 @@ function StudentFloatingChatSurface() {
   );
 }
 
-function ChatSurface({ compact = false, activeDocument = null, allowStudentDocumentUpload = false, onTemporaryDocumentUploaded, onClearActiveDocument }) {
+function ChatSurface({ compact = false, activeDocument = null, allowStudentDocumentUpload = false, onTemporaryDocumentUploaded, onClearActiveDocument, promptRequest = null, onPromptConsumed }) {
   const { user } = useAuth();
+  const role = String(user?.role || "").toLowerCase();
+  const isStaff = ["lecturer", "department_staff", "admin"].includes(role);
   const userKey = String(user?.id || user?._id || user?.email || "guest");
-  const { messages, setMessages, isTyping, sendMessage, clearHistory } = useRagChat(activeDocument?._id || "", userKey);
+  const { messages, setMessages, isTyping, sendMessage, clearHistory } = useRagChat(activeDocument?._id || "", userKey, isStaff ? staffDefaultMessages : studentDefaultMessages);
   const [input, setInput] = useState("");
   const [documentUploading, setDocumentUploading] = useState(false);
   const inputRef = useRef(null);
@@ -440,6 +493,12 @@ function ChatSurface({ compact = false, activeDocument = null, allowStudentDocum
     sendMessage(text);
     setInput("");
   };
+
+  useEffect(() => {
+    if (!promptRequest?.text) return;
+    submit(promptRequest.text);
+    onPromptConsumed?.();
+  }, [promptRequest]);
 
   const uploadPrivateDocument = async (file) => {
     if (!file) return;
@@ -469,7 +528,7 @@ function ChatSurface({ compact = false, activeDocument = null, allowStudentDocum
   };
 
   return (
-    <div className={`flex min-h-0 flex-col overflow-hidden ${compact ? "h-full" : "h-[calc(100vh-220px)] rounded-lg border border-[color:var(--md-border)] bg-[#0f172a]/80"}`}>
+    <div className={`flex min-h-0 flex-col overflow-hidden ${compact ? "h-full" : isStaff ? "ai-staff-chat-shell" : "h-[calc(100vh-220px)] rounded-lg border border-[color:var(--md-border)] bg-[#0f172a]/80"}`}>
       <div className="border-b border-[color:var(--md-border)] bg-[color:var(--md-hover)] p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -477,9 +536,15 @@ function ChatSurface({ compact = false, activeDocument = null, allowStudentDocum
               <Sparkles size={20} />
             </div>
             <div>
-              <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">ATI Buddy Pro - Personalized Student Copilot</h2>
+              <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">
+                {isStaff ? "ATI Buddy Pro - Staff AI Assistant" : "ATI Buddy Pro - Personalized Student Copilot"}
+              </h2>
               <p className="text-xs text-[color:var(--md-text-secondary)]">
-                {activeDocument ? `Reading selected file: ${activeDocument.title}` : "ChatGPT-style help using portal context, student records, timetable, grades, deadlines, and RAG documents"}
+                {activeDocument
+                  ? `Reading selected file: ${activeDocument.title}`
+                  : isStaff
+                    ? "Staff AI assistant for RAG policies, assignments, attendance analytics, student risk, documents, and communication drafts"
+                    : "ChatGPT-style help using portal context, student records, timetable, grades, deadlines, and RAG documents"}
               </p>
             </div>
           </div>
@@ -490,7 +555,7 @@ function ChatSurface({ compact = false, activeDocument = null, allowStudentDocum
         </div>
         {!compact && (
           <div className="mt-4 flex gap-2 overflow-x-auto">
-            {quickPrompts.map((prompt) => (
+            {(isStaff ? staffQuickPrompts : quickPrompts).map((prompt) => (
               <button key={prompt} type="button" onClick={() => submit(prompt)} className="shrink-0 rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] px-3 py-2 text-xs font-bold text-[color:var(--md-text-secondary)] hover:border-sky-400/50 hover:bg-sky-400/10">
                 {prompt}
               </button>
@@ -543,7 +608,7 @@ function ChatSurface({ compact = false, activeDocument = null, allowStudentDocum
               }
             }}
             rows={1}
-            placeholder={activeDocument ? "Ask ATI Buddy Pro anything about this selected document..." : "Message ATI Buddy Pro about study plans, GPA, attendance, timetable, code, or careers..."}
+            placeholder={activeDocument ? "Ask ATI Buddy Pro anything about this selected document..." : isStaff ? "Ask about assignments, low attendance, policies, reports, rubrics, analytics, or documents..." : "Message ATI Buddy Pro about study plans, GPA, attendance, timetable, code, or careers..."}
             className="min-h-12 min-w-0 flex-1 resize-none rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] px-4 py-3 text-sm text-[color:var(--md-text-primary)] outline-none placeholder:text-[color:var(--md-text-secondary)] focus:border-sky-400/60"
           />
           <button type="button" onClick={() => submit()} disabled={!input.trim() || isTyping} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-sky-500 text-slate-950 transition hover:bg-sky-400 disabled:bg-[color:var(--md-hover)] disabled:text-[color:var(--md-text-secondary)]">
@@ -578,8 +643,9 @@ function AIAssistantPage() {
   const role = String(user?.role || "").toLowerCase();
   const userKey = String(user?.id || user?._id || user?.email || "guest");
   const isStudent = role === "student";
-  const canManage = ["lecturer", "admin"].includes(role);
-  const canUpload = ["lecturer", "admin"].includes(role);
+  const isStaff = ["lecturer", "department_staff"].includes(role);
+  const canManage = ["lecturer", "department_staff", "admin"].includes(role);
+  const canUpload = ["lecturer", "department_staff", "admin"].includes(role);
   const knowledgeFileInputRef = useRef(null);
   const [documents, setDocuments] = useState([]);
   const [activeDocument, setActiveDocument] = useState(null);
@@ -589,6 +655,12 @@ function AIAssistantPage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const [promptRequest, setPromptRequest] = useState(null);
+
+  const askStaffPrompt = (text) => {
+    setPromptRequest({ id: nextId(), text });
+    setStatus("");
+  };
 
   const loadDocuments = async () => {
     setError("");
@@ -714,28 +786,54 @@ function AIAssistantPage() {
 
   return (
     <section className="space-y-6">
-      <div className="flex flex-col gap-4 border-b border-[color:var(--md-border)] pb-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className={isStaff ? "ai-staff-hero" : "flex flex-col gap-4 border-b border-[color:var(--md-border)] pb-5 lg:flex-row lg:items-end lg:justify-between"}>
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-300">RAG System</p>
-          <h1 className="mt-2 text-2xl font-black text-[color:var(--md-text-primary)] sm:text-3xl">AI Assistant</h1>
-          <p className="mt-1 text-sm text-[color:var(--md-text-secondary)]">Chat with department knowledge, uploaded course documents, and live portal context using RAG.</p>
+          <p className={isStaff ? "ai-staff-eyebrow" : "text-xs font-bold uppercase tracking-[0.18em] text-sky-300"}>{isStaff ? "Faculty Portal AI" : "RAG System"}</p>
+          <h1 className={isStaff ? "ai-staff-title" : "mt-2 text-2xl font-black text-[color:var(--md-text-primary)] sm:text-3xl"}>{isStaff ? "ATI Buddy Pro - Staff Assistant" : "AI Assistant"}</h1>
+          <p className={isStaff ? "ai-staff-subtitle" : "mt-1 text-sm text-[color:var(--md-text-secondary)]"}>
+            {isStaff
+              ? "Ask staff questions across assignments, attendance, student performance, university policy documents, uploaded files, reports, and communication drafts."
+              : "Chat with department knowledge, uploaded course documents, and live portal context using RAG."}
+          </p>
         </div>
-        <button type="button" onClick={loadDocuments} className="inline-flex w-fit items-center gap-2 rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] px-3 py-2 text-sm font-bold text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)]">
+        <button type="button" onClick={loadDocuments} className={isStaff ? "ai-staff-refresh" : "inline-flex w-fit items-center gap-2 rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] px-3 py-2 text-sm font-bold text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)]"}>
           <RefreshCw size={16} />
-          Refresh
+          Refresh knowledge
         </button>
       </div>
 
       {error && <div className="rounded-lg border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-900 dark:text-red-200">{error}</div>}
       {status && <div className="rounded-lg border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-900 dark:text-emerald-200">{status}</div>}
 
-      <div className="grid gap-4 md:grid-cols-3">
+      {isStaff && (
+        <GlassCard dark className="ai-staff-capabilities">
+          <div className="ai-staff-section-head">
+            <div>
+              <h2>Staff can ask ATI Buddy Pro</h2>
+              <p>Use natural language for policy answers, teaching support, analytics, document intelligence, search, and communication drafts.</p>
+            </div>
+            <span>Click any card to ask</span>
+          </div>
+          <div className="ai-staff-capability-grid">
+            {staffCapabilityCards.map(({ title, description, prompt, Icon }) => (
+              <button key={title} type="button" onClick={() => askStaffPrompt(prompt)} className="ai-staff-capability-card">
+                <span className="ai-staff-capability-icon"><Icon size={18} /></span>
+                <strong>{title}</strong>
+                <small>{description}</small>
+                <em>{prompt}</em>
+              </button>
+            ))}
+          </div>
+        </GlassCard>
+      )}
+
+      <div className={isStaff ? "ai-staff-stat-grid" : "grid gap-4 md:grid-cols-3"}>
         {[
-          ["Knowledge Files", stats.files, FileText],
+          [isStaff ? "Policy & Faculty Files" : "Knowledge Files", stats.files, FileText],
           ["Indexed", stats.indexed, CheckCircle2],
-          ["Vector Chunks", stats.chunks, Database]
+          [isStaff ? "RAG Chunks" : "Vector Chunks", stats.chunks, Database]
         ].map(([label, value, Icon]) => (
-          <GlassCard key={label} dark className="p-5">
+          <GlassCard key={label} dark className={isStaff ? "ai-staff-stat-card" : "p-5"}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-[color:var(--md-text-secondary)]">{label}</p>
@@ -754,12 +852,14 @@ function AIAssistantPage() {
           allowStudentDocumentUpload={isStudent}
           onTemporaryDocumentUploaded={handleTemporaryDocumentUploaded}
           onClearActiveDocument={clearActiveDocument}
+          promptRequest={promptRequest}
+          onPromptConsumed={() => setPromptRequest(null)}
         />
 
         <div className="space-y-6">
           {canUpload && (
-            <GlassCard dark className="p-5">
-              <h2 className="text-lg font-black text-[color:var(--md-text-primary)]">Upload Knowledge</h2>
+            <GlassCard dark className={isStaff ? "ai-staff-side-card" : "p-5"}>
+              <h2 className="text-lg font-black text-[color:var(--md-text-primary)]">{isStaff ? "Knowledge Upload" : "Upload Knowledge"}</h2>
               <p className="mt-1 text-sm text-[color:var(--md-text-secondary)]">
                 Upload PDF, DOCX, PPTX, or TXT files. AI extracts text, chunks it, stores embeddings, and retrieves relevant context during chat.
               </p>
@@ -769,7 +869,7 @@ function AIAssistantPage() {
                 {role === "admin" && (
                   <input value={uploadForm.department} onChange={(event) => setUploadForm((current) => ({ ...current, department: event.target.value }))} placeholder="Department (blank = All Departments)" className="w-full rounded-lg border border-[color:var(--md-border)] bg-slate-950 px-3 py-2.5 text-sm text-[color:var(--md-text-primary)] outline-none focus:border-sky-400" />
                 )}
-                <button type="button" onClick={openUploadPicker} disabled={uploading} className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-[color:var(--md-border)] bg-slate-950 px-4 py-8 text-sm font-bold text-[color:var(--md-text-secondary)] hover:border-sky-400 hover:text-[color:var(--md-text-primary)] disabled:cursor-not-allowed disabled:opacity-60">
+                <button type="button" onClick={openUploadPicker} disabled={uploading} className={isStaff ? "ai-staff-upload-dropzone" : "flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-[color:var(--md-border)] bg-slate-950 px-4 py-8 text-sm font-bold text-[color:var(--md-text-secondary)] hover:border-sky-400 hover:text-[color:var(--md-text-primary)] disabled:cursor-not-allowed disabled:opacity-60"}>
                   <Upload size={18} />
                   {uploading ? "Indexing..." : "Upload document"}
                 </button>
@@ -781,10 +881,16 @@ function AIAssistantPage() {
             </GlassCard>
           )}
 
-          <GlassCard dark className="p-5">
-            <h2 className="text-lg font-black text-[color:var(--md-text-primary)]">Knowledge Files</h2>
+          <GlassCard dark className={isStaff ? "ai-staff-side-card" : "p-5"}>
+            <h2 className="text-lg font-black text-[color:var(--md-text-primary)]">{isStaff ? "Policy & Knowledge Files" : "Knowledge Files"}</h2>
             <div className="mt-4 max-h-[520px] space-y-3 overflow-y-auto">
-              {!documents.length && <p className="py-8 text-center text-sm text-[color:var(--md-text-secondary)]">No knowledge files indexed yet.</p>}
+              {!documents.length && (
+                <div className={isStaff ? "ai-staff-empty-state" : "py-8 text-center text-sm text-[color:var(--md-text-secondary)]"}>
+                  <FileText size={22} />
+                  <p>No knowledge files indexed yet.</p>
+                  <small>Upload policies, handbooks, circulars, SOPs, or teaching materials to enable source-backed answers.</small>
+                </div>
+              )}
               {documents.map((document) => (
                 <div key={document._id} className={`rounded-lg border p-3 ${activeDocument?._id === document._id ? "border-sky-400 bg-sky-500/10" : "border-[color:var(--md-border)] bg-[color:var(--md-hover)]"}`}>
                   {editingId === document._id ? (
@@ -948,7 +1054,7 @@ function FloatingAssistant() {
     <div className="fixed bottom-5 right-5 z-[9999] sm:bottom-6 sm:right-6">
       <AnimatePresence>
         {isOpen && (
-          <motion.div initial={{ opacity: 0, y: 60, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 30, scale: 0.96 }} transition={{ type: "spring", damping: 24, stiffness: 300 }} className={`public-chat-window ${isAuthenticated ? "public-chat-window-pro" : ""}`}>
+          <motion.div initial={{ opacity: 0, y: 60, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 30, scale: 0.96 }} transition={{ type: "spring", damping: 24, stiffness: 300 }} className="public-chat-window">
             <div className="public-chat-header">
               <div className="public-chat-header-main">
                 <div className="public-chat-header-icon">

@@ -129,8 +129,6 @@ const translations = {
     "portal.departmentMessages": "Department Messages",
     "portal.studentSettings": "Student Settings",
     "portal.fees": "Fees",
-    "portal.myClasses": "My Classes",
-    "portal.exams": "Exams",
     "portal.studentProgress": "Student Progress",
   },
   ta: {
@@ -253,8 +251,6 @@ const translations = {
     "portal.departmentMessages": "துறைச் செய்திகள்",
     "portal.studentSettings": "மாணவர் அமைப்புகள்",
     "portal.fees": "கட்டணங்கள்",
-    "portal.myClasses": "எனது வகுப்புகள்",
-    "portal.exams": "தேர்வுகள்",
     "portal.studentProgress": "மாணவர் முன்னேற்றம்",
   },
   si: {
@@ -377,8 +373,6 @@ const translations = {
     "portal.departmentMessages": "දෙපාර්තමේන්තු පණිවිඩ",
     "portal.studentSettings": "ශිෂ්‍ය සැකසුම්",
     "portal.fees": "ගාස්තු",
-    "portal.myClasses": "මගේ පන්ති",
-    "portal.exams": "විභාග",
     "portal.studentProgress": "ශිෂ්‍ය ප්‍රගතිය",
   },
 };

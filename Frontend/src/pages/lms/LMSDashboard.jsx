@@ -134,7 +134,7 @@ export default function LMSDashboard() {
     { icon: ClipboardCheck, title: "Auto Grading", detail: `${totalQuizzes} quizzes with instant marks`, color: "var(--color-mint)" },
     { icon: Award, title: "Certificates", detail: "Generated after course completion", color: "#f59e0b" },
     { icon: MessageSquare, title: "Discussion Forums", detail: "Ask questions and share notes", color: "#8b5cf6" },
-    { icon: ShieldCheck, title: "Exam Readiness", detail: "Progress checks before final exams", color: "#06b6d4" },
+    { icon: ShieldCheck, title: "Progress Readiness", detail: "Progress checks before final assessments", color: "#06b6d4" },
   ];
 
   const liveClasses = [

@@ -19,6 +19,7 @@ function gradeFromScore(score) {
 }
 
 const facultyScope = getDepartmentScope;
+const departmentStaffRoles = ["lecturer", "department_staff"];
 
 async function studentForUser(req) {
   const user = await User.findById(req.user.id).select("email studentProfile");
@@ -51,7 +52,7 @@ async function gradePayload(req, existingRecord = null) {
   const student = await Student.findById(req.body.student || existingRecord?.student);
   if (!student) return { error: "Student record not found." };
 
-  if (req.user?.role === "lecturer") {
+  if (departmentStaffRoles.includes(req.user?.role)) {
     const scope = await facultyScope(req);
     if (scope.error) return { error: scope.error, status: 403 };
     if (student.department !== scope.department || (existingRecord && existingRecord.department !== scope.department)) {
@@ -90,7 +91,7 @@ export async function listGrades(req, res, next) {
       const student = await studentForUser(req);
       if (!student) return res.json([]);
       query.student = student._id;
-    } else if (req.user?.role === "lecturer") {
+    } else if (departmentStaffRoles.includes(req.user?.role)) {
       const scope = await facultyScope(req);
       if (scope.error) return res.status(403).json({ message: scope.error });
       query.department = scope.department;
@@ -141,7 +142,7 @@ export async function deleteGrade(req, res, next) {
     const existing = await GradeRecord.findById(req.params.id);
     if (!existing) return res.status(404).json({ message: "Grade record not found." });
 
-    if (req.user?.role === "lecturer") {
+    if (departmentStaffRoles.includes(req.user?.role)) {
       const scope = await facultyScope(req);
       if (scope.error) return res.status(403).json({ message: scope.error });
       if (existing.department !== scope.department) {

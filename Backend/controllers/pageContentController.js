@@ -4,7 +4,6 @@ const editablePages = [
   { slug: "home", title: "Home" },
   { slug: "about", title: "About" },
   { slug: "faculties", title: "Faculties" },
-  { slug: "courses", title: "Courses" },
   { slug: "news", title: "News" },
   { slug: "contact", title: "Contact" }
 ];
@@ -112,60 +111,6 @@ const facultiesDefaults = {
   ]
 };
 
-const coursesDefaults = {
-  ...emptyContent,
-  sections: [
-    {
-      type: "card",
-      layout: "grid",
-      title: "HND in IT",
-      body: "Duration: 2.5 Years\nEntry: A/L with ICT or equivalent\nFee: Contact office",
-      buttonText: "Contact",
-      buttonLink: "/contact"
-    },
-    {
-      type: "card",
-      layout: "grid",
-      title: "HND in Management",
-      body: "Duration: 2 Years\nEntry: A/L in any stream\nFee: Contact office",
-      buttonText: "Contact",
-      buttonLink: "/contact"
-    },
-    {
-      type: "card",
-      layout: "grid",
-      title: "HND in English",
-      body: "Duration: 2 Years\nEntry: A/L and English proficiency\nFee: Contact office",
-      buttonText: "Contact",
-      buttonLink: "/contact"
-    },
-    {
-      type: "card",
-      layout: "grid",
-      title: "HND in Accountancy",
-      body: "Duration: 2.5 Years\nEntry: A/L commerce preferred\nFee: Contact office",
-      buttonText: "Contact",
-      buttonLink: "/contact"
-    },
-    {
-      type: "card",
-      layout: "grid",
-      title: "HND in Engineering Technology",
-      body: "Duration: 3 Years\nEntry: A/L technology or maths stream\nFee: Contact office",
-      buttonText: "Contact",
-      buttonLink: "/contact"
-    },
-    {
-      type: "card",
-      layout: "grid",
-      title: "Diploma in Business IT",
-      body: "Duration: 1 Year\nEntry: O/L with basic computer literacy\nFee: Contact office",
-      buttonText: "Contact",
-      buttonLink: "/contact"
-    }
-  ]
-};
-
 function normalizeContent(content = {}) {
   return {
     ...emptyContent,
@@ -200,12 +145,11 @@ function isEditableSlug(slug) {
 function defaultContentForSlug(slug) {
   if (slug === "about") return aboutDefaults;
   if (slug === "faculties") return facultiesDefaults;
-  if (slug === "courses") return coursesDefaults;
   return emptyContent;
 }
 
 function shouldPublishDefault(slug) {
-  return ["about", "faculties", "courses"].includes(slug);
+  return ["about", "faculties"].includes(slug);
 }
 
 async function ensurePages() {
@@ -254,14 +198,15 @@ async function ensurePages() {
   );
 
   await PageContent.updateOne(
-    { slug: "courses", "draft.sections": { $size: 0 }, "published.sections": { $size: 0 } },
+    { slug: "courses" },
     {
       $set: {
-        "draft.sections": normalizeContent(coursesDefaults).sections,
-        "published.sections": normalizeContent(coursesDefaults).sections,
-        status: "published",
-        publishedAt: new Date()
-      }
+        title: "Courses",
+        draft: normalizeContent(emptyContent),
+        published: normalizeContent(emptyContent),
+        status: "unpublished"
+      },
+      $unset: { publishedAt: "" }
     }
   );
 
@@ -289,7 +234,9 @@ async function ensurePages() {
 export async function listPages(req, res, next) {
   try {
     await ensurePages();
-    const pages = await PageContent.find({ slug: { $not: /^faculty-details/ } }).sort({ title: 1 });
+    const pages = await PageContent.find({
+      slug: { $nin: ["courses"], $not: /^faculty-details/ }
+    }).sort({ title: 1 });
     res.json(pages);
   } catch (error) {
     next(error);

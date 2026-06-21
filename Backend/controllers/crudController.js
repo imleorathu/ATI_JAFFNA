@@ -4,10 +4,13 @@ import User from "../models/User.js";
 import { deleteStaffAccountBundle, deleteStaffProfiles, syncStaffProfiles } from "./staffProfileSync.js";
 import { staffProfileFromPayload, studentProfileFromPayload } from "../services/userProfileService.js";
 import { syncStudentPaymentStatuses } from "../services/paymentStatusService.js";
+import { getDepartmentScope } from "../middleware/departmentAccess.js";
 
-const departmentBasedFacultyTypes = ["Teaching Staff", "Head of the department"];
+const departmentBasedFacultyTypes = ["Teaching Staff", "Head of the department", "Department Staff"];
 const departmentHeadType = "Head of the department";
 const minimumPasswordLength = 8;
+const departmentStaffRoles = ["lecturer", "department_staff"];
+const departmentManagerRoles = ["admin", ...departmentStaffRoles];
 
 function normalizePayload(Model, payload) {
   if (Model.modelName === "Faculty") {
@@ -45,18 +48,7 @@ function normalizePayload(Model, payload) {
 }
 
 async function facultyScope(req) {
-  if (req.user?.role !== "lecturer") return null;
-
-  const user = await User.findById(req.user.id).select("email");
-  if (!user) return { error: "User account not found." };
-
-  const faculty = await Faculty.findOne({ email: String(user.email || "").trim().toLowerCase() });
-  if (!faculty) return { error: "Faculty profile not found for this account." };
-  if (!departmentBasedFacultyTypes.includes(faculty.staffType) || !faculty.department) {
-    return { error: "This staff account is not assigned to a student department." };
-  }
-
-  return { faculty, department: faculty.department };
+  return getDepartmentScope(req);
 }
 
 function facultyLoginPayload(payload, passwordHash) {
@@ -64,7 +56,7 @@ function facultyLoginPayload(payload, passwordHash) {
     name: payload.fullName,
     email: String(payload.email || "").trim().toLowerCase(),
     passwordHash,
-    role: "lecturer",
+    role: payload.staffType === "Department Staff" ? "department_staff" : "lecturer",
     accountStatus: "approved",
     mustChangePassword: false,
     staffProfile: staffProfileFromPayload(payload)
@@ -156,7 +148,7 @@ export function createCrudController(Model) {
   return {
     async list(req, res, next) {
       try {
-        if (Model.modelName === "TimetableEntry" && req.user?.role === "lecturer") {
+        if (Model.modelName === "TimetableEntry" && departmentStaffRoles.includes(req.user?.role)) {
           const scope = await facultyScope(req);
           if (scope?.error) return res.json([]);
           const items = await Model.find({ department: scope.department }).sort({ day: 1, time: 1 });
@@ -179,7 +171,7 @@ export function createCrudController(Model) {
           return res.status(403).json({ message: "Timetable access is limited to students, faculty, and admins." });
         }
 
-        if (Model.modelName === "Course" && req.user?.role === "lecturer") {
+        if (Model.modelName === "Course" && departmentStaffRoles.includes(req.user?.role)) {
           const scope = await facultyScope(req);
           if (scope?.error) return res.json([]);
           const items = await Model.find({ department: scope.department }).sort({ createdAt: -1 });
@@ -198,7 +190,7 @@ export function createCrudController(Model) {
           return res.status(403).json({ message: "Course access is limited to students, faculty, and admins." });
         }
 
-        if (Model.modelName === "Student" && req.user?.role === "lecturer") {
+        if (Model.modelName === "Student" && departmentStaffRoles.includes(req.user?.role)) {
           const scope = await facultyScope(req);
           if (scope?.error) return res.json([]);
           const items = await Model.find({ department: scope.department }).sort({ createdAt: -1 });
@@ -225,7 +217,7 @@ export function createCrudController(Model) {
       try {
         const item = await Model.findById(req.params.id);
         if (!item) return res.status(404).json({ message: "Record not found" });
-        if (Model.modelName === "TimetableEntry" && req.user?.role === "lecturer") {
+        if (Model.modelName === "TimetableEntry" && departmentStaffRoles.includes(req.user?.role)) {
           const scope = await facultyScope(req);
           if (scope?.error || item.department !== scope.department) return res.status(403).json({ message: "You can only access timetable entries in your department." });
         } else if (Model.modelName === "TimetableEntry" && req.user?.role === "student") {
@@ -237,7 +229,7 @@ export function createCrudController(Model) {
         } else if (Model.modelName === "TimetableEntry" && req.user && req.user.role !== "admin") {
           return res.status(403).json({ message: "Timetable access is limited to students, faculty, and admins." });
         }
-        if (Model.modelName === "Course" && req.user?.role === "lecturer") {
+        if (Model.modelName === "Course" && departmentStaffRoles.includes(req.user?.role)) {
           const scope = await facultyScope(req);
           if (scope?.error || item.department !== scope.department) return res.status(403).json({ message: "You can only access courses in your department." });
         } else if (Model.modelName === "Course" && req.user?.role === "student") {
@@ -247,7 +239,7 @@ export function createCrudController(Model) {
         } else if (Model.modelName === "Course" && req.user && req.user.role !== "admin") {
           return res.status(403).json({ message: "Course access is limited to students, faculty, and admins." });
         }
-        if (Model.modelName === "Student" && req.user?.role === "lecturer") {
+        if (Model.modelName === "Student" && departmentStaffRoles.includes(req.user?.role)) {
           const scope = await facultyScope(req);
           if (scope?.error || item.department !== scope.department) return res.status(403).json({ message: "You can only access students in your department." });
         } else if (Model.modelName === "Student" && req.user?.role !== "admin") {
@@ -264,11 +256,11 @@ export function createCrudController(Model) {
         const payload = normalizePayload(Model, req.body);
 
         if (Model.modelName === "Student") {
-          if (!["admin", "lecturer"].includes(req.user?.role)) {
+          if (!departmentManagerRoles.includes(req.user?.role)) {
             return res.status(403).json({ message: "Admin or faculty access required." });
           }
 
-          if (req.user?.role === "lecturer") {
+          if (departmentStaffRoles.includes(req.user?.role)) {
             const scope = await facultyScope(req);
             if (scope?.error) return res.status(403).json({ message: scope.error });
             payload.department = scope.department;
@@ -337,7 +329,7 @@ export function createCrudController(Model) {
           } catch (error) {
             await Model.findByIdAndDelete(item._id);
             await deleteStaffProfiles(item);
-            await User.findOneAndDelete({ email, role: "lecturer" });
+            await User.findOneAndDelete({ email, role: { $in: departmentStaffRoles } });
             throw error;
           }
 
@@ -345,11 +337,11 @@ export function createCrudController(Model) {
         }
 
         if (Model.modelName === "Course") {
-          if (!["admin", "lecturer"].includes(req.user?.role)) {
+          if (!departmentManagerRoles.includes(req.user?.role)) {
             return res.status(403).json({ message: "Admin or faculty access required." });
           }
 
-          if (req.user?.role === "lecturer") {
+          if (departmentStaffRoles.includes(req.user?.role)) {
             const scope = await facultyScope(req);
             if (scope?.error) return res.status(403).json({ message: scope.error });
             payload.department = scope.department;
@@ -360,11 +352,11 @@ export function createCrudController(Model) {
         }
 
         if (Model.modelName === "TimetableEntry") {
-          if (!["admin", "lecturer"].includes(req.user?.role)) {
+          if (!departmentManagerRoles.includes(req.user?.role)) {
             return res.status(403).json({ message: "Admin or faculty access required." });
           }
 
-          if (req.user?.role === "lecturer") {
+          if (departmentStaffRoles.includes(req.user?.role)) {
             const scope = await facultyScope(req);
             if (scope?.error) return res.status(403).json({ message: scope.error });
             payload.department = scope.department;
@@ -389,7 +381,7 @@ export function createCrudController(Model) {
     async update(req, res, next) {
       try {
         if (Model.modelName === "Student") {
-          if (!["admin", "lecturer"].includes(req.user?.role)) {
+          if (!departmentManagerRoles.includes(req.user?.role)) {
             return res.status(403).json({ message: "Admin or faculty access required." });
           }
 
@@ -397,7 +389,7 @@ export function createCrudController(Model) {
           if (!currentStudent) return res.status(404).json({ message: "Record not found" });
 
           let scope = null;
-          if (req.user?.role === "lecturer") {
+          if (departmentStaffRoles.includes(req.user?.role)) {
             scope = await facultyScope(req);
             if (scope?.error) return res.status(403).json({ message: scope.error });
             if (currentStudent.department !== scope.department) {
@@ -511,7 +503,7 @@ export function createCrudController(Model) {
           if (user) {
             user.name = payload.fullName;
             user.email = nextEmail;
-            user.role = "lecturer";
+            user.role = payload.staffType === "Department Staff" ? "department_staff" : "lecturer";
             user.accountStatus = "approved";
             user.studentProfile = undefined;
             user.staffProfile = staffProfileFromPayload(payload);
@@ -530,7 +522,7 @@ export function createCrudController(Model) {
         }
 
         if (Model.modelName === "Course") {
-          if (!["admin", "lecturer"].includes(req.user?.role)) {
+          if (!departmentManagerRoles.includes(req.user?.role)) {
             return res.status(403).json({ message: "Admin or faculty access required." });
           }
 
@@ -538,7 +530,7 @@ export function createCrudController(Model) {
           if (!currentCourse) return res.status(404).json({ message: "Record not found" });
 
           const payload = normalizePayload(Model, req.body);
-          if (req.user?.role === "lecturer") {
+          if (departmentStaffRoles.includes(req.user?.role)) {
             const scope = await facultyScope(req);
             if (scope?.error) return res.status(403).json({ message: scope.error });
             if (currentCourse.department !== scope.department) {
@@ -552,7 +544,7 @@ export function createCrudController(Model) {
         }
 
         if (Model.modelName === "TimetableEntry") {
-          if (!["admin", "lecturer"].includes(req.user?.role)) {
+          if (!departmentManagerRoles.includes(req.user?.role)) {
             return res.status(403).json({ message: "Admin or faculty access required." });
           }
 
@@ -560,7 +552,7 @@ export function createCrudController(Model) {
           if (!currentEntry) return res.status(404).json({ message: "Record not found" });
 
           const payload = normalizePayload(Model, req.body);
-          if (req.user?.role === "lecturer") {
+          if (departmentStaffRoles.includes(req.user?.role)) {
             const scope = await facultyScope(req);
             if (scope?.error) return res.status(403).json({ message: scope.error });
             if (currentEntry.department !== scope.department) {
@@ -588,7 +580,7 @@ export function createCrudController(Model) {
 
     async remove(req, res, next) {
       try {
-        if (Model.modelName === "TimetableEntry" && req.user?.role === "lecturer") {
+        if (Model.modelName === "TimetableEntry" && departmentStaffRoles.includes(req.user?.role)) {
           const scope = await facultyScope(req);
           if (scope?.error) return res.status(403).json({ message: scope.error });
           const item = await Model.findOneAndDelete({ _id: req.params.id, department: scope.department });
@@ -600,7 +592,7 @@ export function createCrudController(Model) {
           return res.status(403).json({ message: "Admin or faculty access required." });
         }
 
-        if (Model.modelName === "Course" && req.user?.role === "lecturer") {
+        if (Model.modelName === "Course" && departmentStaffRoles.includes(req.user?.role)) {
           const scope = await facultyScope(req);
           if (scope?.error) return res.status(403).json({ message: scope.error });
           const item = await Model.findOneAndDelete({ _id: req.params.id, department: scope.department });
@@ -612,7 +604,7 @@ export function createCrudController(Model) {
           return res.status(403).json({ message: "Admin or faculty access required." });
         }
 
-        if (Model.modelName === "Student" && req.user?.role === "lecturer") {
+        if (Model.modelName === "Student" && departmentStaffRoles.includes(req.user?.role)) {
           const scope = await facultyScope(req);
           if (scope?.error) return res.status(403).json({ message: scope.error });
           const item = await Model.findOneAndDelete({ _id: req.params.id, department: scope.department });

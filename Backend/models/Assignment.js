@@ -43,12 +43,45 @@ const submissionSchema = new mongoose.Schema(
   { _id: true }
 );
 
+const assignmentDetailsSchema = new mongoose.Schema(
+  {
+    lecturerDepartment: { type: String, trim: true },
+    academicYearSemester: { type: String, trim: true },
+    category: { type: String, enum: ["Quiz", "Homework", "Research", "Lab Report", "Presentation", "Project", ""], default: "" },
+    coverImage: { type: attachmentSchema, default: null },
+    estimatedCompletionTime: { type: String, trim: true },
+    difficultyLevel: { type: String, enum: ["Beginner", "Intermediate", "Advanced", "Expert", ""], default: "" },
+    plagiarismSettings: { type: String, trim: true },
+    autoSaveDraft: { type: Boolean, default: true },
+    gradingType: { type: String, enum: ["manual", "auto", "hybrid", ""], default: "" },
+    passMark: { type: Number, default: 0 },
+    gradeScale: { type: String, trim: true, default: "Percentage Based" },
+    lateSubmissionPenalty: { type: Number, default: 0 },
+    missingFilePenalty: { type: Number, default: 0 },
+    plagiarismPenalty: { type: Number, default: 0 },
+    formId: { type: String, trim: true },
+    audienceSelection: { type: String, enum: ["course", "batch", "group", "students", ""], default: "" },
+    selectedAudienceGroup: { type: String, trim: true },
+    selectedStudentIds: { type: [String], default: [] },
+    inAppNotification: { type: Boolean, default: true },
+    smsNotification: { type: Boolean, default: false },
+    confirmationFields: {
+      assignmentName: { type: Boolean, default: true },
+      totalMarks: { type: Boolean, default: true },
+      studentCount: { type: Boolean, default: true },
+      estimatedCompletionTime: { type: Boolean, default: true }
+    }
+  },
+  { _id: false }
+);
+
 const assignmentSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
     subject: { type: String, required: true, trim: true },
     topicModule: { type: String, trim: true },
     description: { type: String, trim: true },
+    instructions: { type: String, trim: true },
     department: { type: String, required: true, trim: true },
     academicStage: {
       type: String,
@@ -59,15 +92,14 @@ const assignmentSchema = new mongoose.Schema(
     student: { type: mongoose.Schema.Types.ObjectId, ref: "Student", default: null },
     studentName: { type: String, trim: true },
     studentId: { type: String, trim: true },
-    dueDate: { type: Date, required: true },
     totalMarks: { type: Number, default: 100, min: 0 },
     status: { type: String, enum: ["draft", "published", "closed"], default: "published" },
     publishAt: { type: Date },
-    visibility: { type: String, enum: ["department", "group", "student"], default: "department" },
     notifyByEmail: { type: Boolean, default: false },
     attachmentUrl: { type: String, trim: true },
     attachments: { type: [attachmentSchema], default: [] },
     materials: { type: [attachmentSchema], default: [] },
+    details: { type: assignmentDetailsSchema, default: () => ({}) },
     announcements: { type: [commentSchema], default: [] },
     comments: { type: [commentSchema], default: [] },
     submissions: { type: [submissionSchema], default: [] },
@@ -76,7 +108,7 @@ const assignmentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-assignmentSchema.index({ department: 1, academicStage: 1, dueDate: 1 });
-assignmentSchema.index({ student: 1, dueDate: 1 });
+assignmentSchema.index({ department: 1, academicStage: 1, createdAt: -1 });
+assignmentSchema.index({ student: 1, createdAt: -1 });
 
 export default mongoose.model("Assignment", assignmentSchema);

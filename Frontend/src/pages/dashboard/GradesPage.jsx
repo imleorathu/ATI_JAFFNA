@@ -90,9 +90,9 @@ export default function GradesPage() {
   const { confirm } = useModal();
   const { user } = useAuth();
   const role = String(user?.role || "").toLowerCase();
-  const canManage = ["lecturer", "admin"].includes(role);
+  const canManage = ["lecturer", "department_staff", "admin"].includes(role);
   const isAdmin = role === "admin";
-  const isFaculty = role === "lecturer";
+  const isFaculty = ["lecturer", "department_staff"].includes(role);
 
   const [grades, setGrades] = useState([]);
   const [students, setStudents] = useState([]);
@@ -104,6 +104,7 @@ export default function GradesPage() {
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [semesterFilter, setSemesterFilter] = useState("all");
   const [academicStageFilter, setAcademicStageFilter] = useState("all");
+  const [studentFilter, setStudentFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -135,20 +136,55 @@ export default function GradesPage() {
     [grades]
   );
   const academicStages = useMemo(() => [...new Set(grades.map((item) => item.academicStage).filter(Boolean))].sort(), [grades]);
+  const studentOptions = useMemo(() => {
+    const byKey = new Map();
+    const addStudent = ({ key, name, studentId, academicStage }) => {
+      if (!key || byKey.has(String(key))) return;
+      byKey.set(String(key), {
+        key: String(key),
+        name: name || studentId || "Unnamed student",
+        studentId: studentId || "",
+        academicStage: academicStage || ""
+      });
+    };
+
+    students.forEach((student) => addStudent({
+      key: student._id || student.studentId || student.fullName,
+      name: student.fullName,
+      studentId: student.studentId,
+      academicStage: student.academicStage
+    }));
+
+    grades.forEach((grade) => addStudent({
+      key: grade.student || grade.studentId || grade.studentName,
+      name: grade.studentName,
+      studentId: grade.studentId,
+      academicStage: grade.academicStage
+    }));
+
+    return [...byKey.values()].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  }, [grades, students]);
 
   const filteredGrades = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return grades.filter((item) =>
-      (departmentFilter === "all" || item.department === departmentFilter) &&
-      (subjectFilter === "all" || item.subject === subjectFilter) &&
-      (semesterFilter === "all" || String(item.semester) === String(semesterFilter)) &&
-      (academicStageFilter === "all" || item.academicStage === academicStageFilter) &&
-      (!query ||
-        [item.studentName, item.studentId, item.department, item.academicStage, item.subject, item.grade, item.remarks]
-          .filter(Boolean)
-          .some((v) => String(v).toLowerCase().includes(query)))
-    );
-  }, [academicStageFilter, departmentFilter, grades, search, semesterFilter, subjectFilter]);
+    return grades.filter((item) => {
+      const matchesStudent =
+        studentFilter === "all" ||
+        [item.student, item.studentId, item.studentName].filter(Boolean).some((value) => String(value) === String(studentFilter));
+
+      return (
+        (departmentFilter === "all" || item.department === departmentFilter) &&
+        (subjectFilter === "all" || item.subject === subjectFilter) &&
+        (semesterFilter === "all" || String(item.semester) === String(semesterFilter)) &&
+        (academicStageFilter === "all" || item.academicStage === academicStageFilter) &&
+        matchesStudent &&
+        (!query ||
+          [item.studentName, item.studentId, item.department, item.academicStage, item.subject, item.grade, item.remarks]
+            .filter(Boolean)
+            .some((v) => String(v).toLowerCase().includes(query)))
+      );
+    });
+  }, [academicStageFilter, departmentFilter, grades, search, semesterFilter, subjectFilter, studentFilter]);
 
   const gpa = useMemo(() => computeGpa(filteredGrades), [filteredGrades]);
   const totalCredits = useMemo(() => filteredGrades.reduce((s, i) => s + Number(i.credits || 0), 0), [filteredGrades]);
@@ -176,16 +212,23 @@ export default function GradesPage() {
   const subjectReports = useMemo(() => summarizeBy(filteredGrades, (item) => item.subject), [filteredGrades]);
   const semesterReports = useMemo(() => summarizeBy(filteredGrades, (item) => `Semester ${item.semester}`), [filteredGrades]);
   const departmentReports = useMemo(() => summarizeBy(filteredGrades, (item) => item.department), [filteredGrades]);
+  const currentStudyYearReports = useMemo(() => summarizeBy(filteredGrades, (item) => item.academicStage, "No study year"), [filteredGrades]);
   const adminStats = useMemo(() => ({
     records: filteredGrades.length,
     departments: new Set(filteredGrades.map((item) => item.department).filter(Boolean)).size,
     subjects: new Set(filteredGrades.map((item) => item.subject).filter(Boolean)).size,
     averageScore: filteredGrades.length ? filteredGrades.reduce((sum, item) => sum + Number(item.score || 0), 0) / filteredGrades.length : 0
   }), [filteredGrades]);
+  const facultyStats = useMemo(() => ({
+    records: filteredGrades.length,
+    students: new Set(filteredGrades.map((item) => item.studentId || item.studentName || item.student).filter(Boolean)).size,
+    subjects: new Set(filteredGrades.map((item) => item.subject).filter(Boolean)).size,
+    studyYears: new Set(filteredGrades.map((item) => item.academicStage).filter(Boolean)).size
+  }), [filteredGrades]);
   const chartData = useMemo(() => filteredGrades.map((item) => ({ subject: item.subject.length > 14 ? `${item.subject.slice(0, 12)}…` : item.subject, score: item.score, fullName: item.subject })), [filteredGrades]);
 
   const chartRows = useMemo(() => {
-    const source = isAdmin ? subjectReports : chartData.map((item) => ({ label: item.fullName, averageScore: item.score }));
+    const source = (isAdmin || isFaculty) ? subjectReports : chartData.map((item) => ({ label: item.fullName, averageScore: item.score }));
     return source.map((item) => {
       const label = item.label || "Subject";
       return {
@@ -194,9 +237,17 @@ export default function GradesPage() {
         fullName: label
       };
     });
-  }, [chartData, isAdmin, subjectReports]);
+  }, [chartData, isAdmin, isFaculty, subjectReports]);
 
   const resetForm = () => { setForm(emptyForm); setEditingId(""); setShowForm(false); };
+  const clearGradeFilters = () => {
+    setDepartmentFilter("all");
+    setSubjectFilter("all");
+    setSemesterFilter("all");
+    setAcademicStageFilter("all");
+    setStudentFilter("all");
+    setSearch("");
+  };
 
   const startCreate = () => { setError(""); setStatus(""); setForm(emptyForm); setEditingId(""); setShowForm(true); };
 
@@ -263,7 +314,7 @@ export default function GradesPage() {
           <p className="portal-page-label">{isAdmin ? "Admin" : canManage ? "Department Staff" : "Student"}</p>
           <h1 className="portal-page-title">{canManage ? "Grade Management" : "Academic Performance"}</h1>
           <p className="portal-page-subtitle">
-            {isAdmin ? "Review all department grades with subject-wise, semester, and academic-stage reports." : canManage ? "Manage grades only for students in your department." : "View your official grades and GPA breakdown."}
+            {isAdmin ? "Review all department grades with subject-wise, semester, and academic-stage reports." : canManage ? "Manage department grades by subject, current study year, or a particular student." : "View your official grades and GPA breakdown."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -319,13 +370,7 @@ export default function GradesPage() {
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setDepartmentFilter("all");
-                  setSubjectFilter("all");
-                  setSemesterFilter("all");
-                  setAcademicStageFilter("all");
-                  setSearch("");
-                }}
+                onClick={clearGradeFilters}
                 className="portal-btn"
               >
                 Clear Filters
@@ -348,6 +393,101 @@ export default function GradesPage() {
                 <option value="all">All academic stages</option>
                 {academicStages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
               </select>
+            </div>
+          </GlassCard>
+        </>
+      )}
+
+      {isFaculty && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              { label: "Visible Records", value: facultyStats.records, Icon: Award, color: "var(--md-primary)" },
+              { label: "Students", value: facultyStats.students, Icon: Search, color: "var(--color-ocean)" },
+              { label: "Subjects", value: facultyStats.subjects, Icon: BarChart3, color: "var(--color-mint)" },
+              { label: "Current Study Years", value: facultyStats.studyYears, Icon: Award, color: "#f59e0b" }
+            ].map(({ label, value, Icon, color }) => (
+              <div key={label} className="portal-stat-card">
+                <div>
+                  <p className="portal-stat-label">{label}</p>
+                  <p className="portal-stat-value" style={{ color }}>{value}</p>
+                </div>
+                <div className="portal-stat-icon" style={{ background: `${color}18`, color }}>
+                  <Icon size={22} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <GlassCard className="p-5">
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="classroom-section-title">Department Staff Grade Categories</h2>
+                <p className="text-sm" style={{ color: "var(--md-text-secondary)" }}>Filter by subject, current study year, and a particular student in your department.</p>
+              </div>
+              <button type="button" onClick={clearGradeFilters} className="portal-btn">
+                Clear Filters
+              </button>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <label className="space-y-1">
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--md-text-secondary)]">Subject</span>
+                <select value={subjectFilter} onChange={(event) => setSubjectFilter(event.target.value)} className="portal-input">
+                  <option value="all">All subjects</option>
+                  {subjects.map((subject) => <option key={subject} value={subject}>{subject}</option>)}
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--md-text-secondary)]">Current study year</span>
+                <select value={academicStageFilter} onChange={(event) => setAcademicStageFilter(event.target.value)} className="portal-input">
+                  <option value="all">All study years</option>
+                  {academicStages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--md-text-secondary)]">Student</span>
+                <select value={studentFilter} onChange={(event) => setStudentFilter(event.target.value)} className="portal-input">
+                  <option value="all">All students</option>
+                  {studentOptions.map((student) => (
+                    <option key={student.key} value={student.key}>
+                      {student.name}{student.studentId ? ` (${student.studentId})` : ""}{student.academicStage ? ` - ${student.academicStage}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--md-text-secondary)]">Search particular student</span>
+                <div className="portal-search w-full">
+                  <Search size={15} />
+                  <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, ID, subject..." className="w-full" />
+                </div>
+              </label>
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--md-text-secondary)]">Subjects</p>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => setSubjectFilter("all")} className={subjectFilter === "all" ? "portal-btn-primary" : "portal-btn"}>All</button>
+                  {subjects.map((subject) => (
+                    <button key={subject} type="button" onClick={() => setSubjectFilter(subject)} className={subjectFilter === subject ? "portal-btn-primary" : "portal-btn"}>
+                      {subject}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--md-text-secondary)]">Current study year</p>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => setAcademicStageFilter("all")} className={academicStageFilter === "all" ? "portal-btn-primary" : "portal-btn"}>All</button>
+                  {academicStages.map((stage) => (
+                    <button key={stage} type="button" onClick={() => setAcademicStageFilter(stage)} className={academicStageFilter === stage ? "portal-btn-primary" : "portal-btn"}>
+                      {stage}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </GlassCard>
         </>
@@ -380,6 +520,13 @@ export default function GradesPage() {
           <ReportTable title="Department Reports" rows={departmentReports} />
           <ReportTable title="Subject-Wise Reports" rows={subjectReports} />
           <ReportTable title="Semester Reports" rows={semesterReports} />
+        </div>
+      )}
+
+      {isFaculty && (
+        <div className="grid gap-6 xl:grid-cols-2">
+          <ReportTable title="Subject Categories" rows={subjectReports} />
+          <ReportTable title="Current Study Year Categories" rows={currentStudyYearReports} />
         </div>
       )}
 
@@ -419,8 +566,8 @@ export default function GradesPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Chart */}
         <GlassCard className="p-5">
-          <h2 className="classroom-section-title">{isAdmin ? "Subject Average Performance" : "Subject Performance"}</h2>
-          <p className="mt-1 text-sm" style={{ color: "var(--md-text-secondary)" }}>{isAdmin ? "Average scores by subject across the selected report scope." : "Scores by subject."}</p>
+          <h2 className="classroom-section-title">{(isAdmin || isFaculty) ? "Subject Average Performance" : "Subject Performance"}</h2>
+          <p className="mt-1 text-sm" style={{ color: "var(--md-text-secondary)" }}>{(isAdmin || isFaculty) ? "Average scores by subject across the selected report scope." : "Scores by subject."}</p>
           <div className="mt-4 h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartRows}>
@@ -445,7 +592,7 @@ export default function GradesPage() {
             </div>
             <label className="portal-search">
               <Search size={15} />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search grades" style={{ width: "14rem" }} />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={canManage ? "Search particular student" : "Search grades"} style={{ width: "14rem" }} />
             </label>
           </div>
 

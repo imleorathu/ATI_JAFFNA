@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import QRCode from "qrcode";
@@ -8,13 +8,20 @@ import {
   Bot,
   CalendarCheck,
   Camera,
+  Bell,
+  ChevronDown,
   Clock,
+  Download,
   FileText,
   GraduationCap,
+  Inbox,
   Mail,
   MapPin,
+  Pin,
   Phone,
+  Search,
   ShieldCheck,
+  Star,
   User
 } from "lucide-react";
 import GlassCard from "../../components/GlassCard";
@@ -56,6 +63,207 @@ function initials(name = "Student") {
     .join("") || "ST";
 }
 
+const categoryStyles = {
+  Urgent: "border-red-200 bg-red-50 text-red-700",
+  Academic: "border-amber-200 bg-amber-50 text-amber-700",
+  Event: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  General: "border-blue-200 bg-blue-50 text-blue-700"
+};
+
+const categoryDotStyles = {
+  Urgent: "bg-red-500",
+  Academic: "bg-amber-400",
+  Event: "bg-emerald-500",
+  General: "bg-blue-500"
+};
+
+const filters = ["All", "Urgent", "Academic", "Event", "General"];
+
+function getAnnouncementCategory(notice = {}) {
+  if (["Urgent", "Academic", "Event", "General"].includes(notice.category)) return notice.category;
+  const text = `${notice.category || ""} ${notice.title || ""} ${notice.body || ""}`.toLowerCase();
+  if (text.includes("urgent") || text.includes("important") || text.includes("deadline")) return "Urgent";
+  if (text.includes("assignment") || text.includes("lecture") || text.includes("academic")) return "Academic";
+  if (text.includes("event") || text.includes("workshop") || text.includes("seminar") || text.includes("meet")) return "Event";
+  return "General";
+}
+
+function relativeTime(value) {
+  if (!value) return "Recently";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Recently";
+  const diffMs = Date.now() - date.getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes} min${minutes === 1 ? "" : "s"} ago`;
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function normalizeAnnouncement(notice) {
+  const category = getAnnouncementCategory(notice);
+  const createdAt = notice.createdAt || new Date().toISOString();
+  return {
+    id: notice._id || notice.id || `${notice.title}-${createdAt}`,
+    title: notice.title || "Untitled announcement",
+    description: notice.body || notice.description || "Announcement details will appear here.",
+    category,
+    date: createdAt,
+    author: notice.author || "ATI Jaffna Admin",
+    pinned: Boolean(notice.pinned) || category === "Urgent",
+    attachments: Array.isArray(notice.attachments) ? notice.attachments : []
+  };
+}
+
+function LatestAnnouncementsSection() {
+  const [announcements, setAnnouncements] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState("All");
+  const [expandedIds, setExpandedIds] = useState([]);
+  const [visibleCount, setVisibleCount] = useState(4);
+  const [readIds, setReadIds] = useState(() => JSON.parse(localStorage.getItem("atiReadAnnouncements") || "[]"));
+  const [savedIds, setSavedIds] = useState(() => JSON.parse(localStorage.getItem("atiSavedAnnouncements") || "[]"));
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    apiFetch("/api/notices")
+      .then((items) => {
+        if (active) setAnnouncements((Array.isArray(items) ? items : []).map(normalizeAnnouncement));
+      })
+      .catch(() => {
+        if (active) setAnnouncements([]);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("atiReadAnnouncements", JSON.stringify(readIds));
+  }, [readIds]);
+
+  useEffect(() => {
+    localStorage.setItem("atiSavedAnnouncements", JSON.stringify(savedIds));
+  }, [savedIds]);
+
+  const filteredAnnouncements = useMemo(() => {
+    const search = query.trim().toLowerCase();
+    return announcements
+      .filter((item) => activeFilter === "All" || item.category === activeFilter)
+      .filter((item) => !search || [item.title, item.description, item.author, item.category].some((value) => String(value).toLowerCase().includes(search)))
+      .sort((a, b) => {
+        const priority = (item) => (item.category === "Urgent" ? 3 : 0) + (item.pinned ? 2 : 0);
+        return priority(b) - priority(a) || new Date(b.date) - new Date(a.date);
+      });
+  }, [activeFilter, announcements, query]);
+
+  const visibleAnnouncements = filteredAnnouncements.slice(0, visibleCount);
+
+  const markRead = (id) => setReadIds((current) => (current.includes(id) ? current : [...current, id]));
+  const toggleSaved = (id) => setSavedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+  const toggleExpanded = (id) => setExpandedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+
+  return (
+    <GlassCard className="student-announcements">
+      <div className="student-announcements-header">
+        <div className="student-announcements-title">
+          <span className="student-announcements-title-icon"><Bell size={20} /></span>
+          <div>
+            <h2>Latest Announcements</h2>
+            <p>{loading ? "Loading campus updates..." : `${filteredAnnouncements.length} updates available`}</p>
+          </div>
+        </div>
+        <Link to="/student/announcements" className="student-announcements-view-all">View All</Link>
+      </div>
+
+      <div className="student-announcements-toolbar">
+        <label className="student-announcements-search">
+          <Search size={16} aria-hidden="true" />
+          <span className="sr-only">Search announcements</span>
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search announcements" />
+        </label>
+        <div className="student-announcements-filters" role="group" aria-label="Filter announcements by category">
+          {filters.map((filter) => (
+            <button key={filter} type="button" onClick={() => { setActiveFilter(filter); setVisibleCount(4); }} className={activeFilter === filter ? "active" : ""}>
+              {filter === "Event" ? "Events" : filter}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="student-announcements-list" aria-label="Loading announcements">
+          {[0, 1, 2].map((item) => <div key={item} className="student-announcement-skeleton" />)}
+        </div>
+      ) : visibleAnnouncements.length ? (
+        <div className="student-announcements-list">
+          {visibleAnnouncements.map((announcement) => {
+            const isRead = readIds.includes(announcement.id);
+            const isSaved = savedIds.includes(announcement.id);
+            const isExpanded = expandedIds.includes(announcement.id);
+            return (
+              <article key={announcement.id} className={`student-announcement-card ${announcement.category === "Urgent" ? "student-announcement-urgent" : ""}`} tabIndex={0}>
+                <div className="student-announcement-main">
+                  <div className="student-announcement-topline">
+                    <span className={`student-announcement-category ${categoryStyles[announcement.category]}`}>
+                      <i className={categoryDotStyles[announcement.category]} />
+                      {announcement.category}
+                    </span>
+                    {announcement.pinned && <span className="student-announcement-pin"><Pin size={13} /> Pinned</span>}
+                    {!isRead && <span className="student-announcement-new">New</span>}
+                  </div>
+                  <h3>{announcement.title}</h3>
+                  <p className={isExpanded ? "" : "line-clamp-2"}>{announcement.description}</p>
+                  <div className="student-announcement-meta">
+                    <span>{relativeTime(announcement.date)}</span>
+                    <span>{announcement.author}</span>
+                  </div>
+                </div>
+                <div className="student-announcement-actions">
+                  <button type="button" onClick={() => toggleExpanded(announcement.id)} aria-expanded={isExpanded} aria-label={`${isExpanded ? "Collapse" : "Expand"} ${announcement.title}`}>
+                    <ChevronDown className={isExpanded ? "rotate-180" : ""} size={16} />
+                  </button>
+                  <button type="button" onClick={() => markRead(announcement.id)} disabled={isRead} aria-label={`Mark ${announcement.title} as read`}>
+                    {isRead ? "Read" : "Mark Read"}
+                  </button>
+                  <button type="button" onClick={() => toggleSaved(announcement.id)} aria-pressed={isSaved} aria-label={`${isSaved ? "Unsave" : "Save"} ${announcement.title}`}>
+                    <Star size={16} fill={isSaved ? "currentColor" : "none"} />
+                  </button>
+                  {announcement.attachments.length > 0 && (
+                    <a href={announcement.attachments[0].url} target="_blank" rel="noreferrer" aria-label={`Download attachment for ${announcement.title}`}>
+                      <Download size={16} />
+                    </a>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+          {visibleCount < filteredAnnouncements.length && (
+            <button type="button" onClick={() => setVisibleCount((count) => count + 4)} className="student-announcements-load-more">
+              Load more announcements
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="student-announcements-empty">
+          <Inbox size={34} />
+          <h3>No announcements found</h3>
+          <p>Try another search term or filter. New student updates will appear here.</p>
+        </div>
+      )}
+    </GlassCard>
+  );
+}
+
 export default function StudentDashboard({ user }) {
   const { updateUser } = useAuth();
   const studentDetails = user?.studentProfile || {};
@@ -65,6 +273,8 @@ export default function StudentDashboard({ user }) {
   const [dashboardMessage, setDashboardMessage] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
   const [qrCodeUrl, setQrCodeUrl] = useState("");
+  const [assignmentMarks, setAssignmentMarks] = useState([]);
+  const [marksLoading, setMarksLoading] = useState(true);
 
   const profile = {
     name: user?.name || "Student",
@@ -89,6 +299,31 @@ export default function StudentDashboard({ user }) {
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setMarksLoading(true);
+    apiFetch("/api/assignments")
+      .then((items) => {
+        if (!active) return;
+        const marks = (Array.isArray(items) ? items : [])
+          .map((assignment) => ({ assignment, submission: assignment.submissions?.[0] }))
+          .filter(({ submission }) => submission)
+          .sort((a, b) => new Date(b.submission?.gradedAt || b.submission?.submittedAt || 0) - new Date(a.submission?.gradedAt || a.submission?.submittedAt || 0))
+          .slice(0, 4);
+        setAssignmentMarks(marks);
+      })
+      .catch(() => {
+        if (active) setAssignmentMarks([]);
+      })
+      .finally(() => {
+        if (active) setMarksLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -277,6 +512,43 @@ export default function StudentDashboard({ user }) {
         </motion.div>
 
         {dashboardMessage && <div className="portal-alert-success">{dashboardMessage}</div>}
+
+        <LatestAnnouncementsSection />
+
+        <GlassCard className={surfaceCard}>
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="classroom-section-title">Assignment Marks</h2>
+              <p className="mt-1 classroom-body text-[color:var(--md-text-secondary)]">Latest marks and feedback published by department staff.</p>
+            </div>
+            <Link to="/student/assignments" className={actionButton}>
+              <FileText size={14} />
+              View Assignments
+            </Link>
+          </div>
+
+          {marksLoading ? (
+            <p className="py-8 text-center text-sm text-[color:var(--md-text-secondary)]">Loading assignment marks...</p>
+          ) : assignmentMarks.length ? (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {assignmentMarks.map(({ assignment, submission }) => (
+                <div key={`${assignment._id}-${submission._id}`} className={softPanel + " p-4"}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[color:var(--md-primary)]">{assignment.subject || "Assignment"}</p>
+                      <h3 className="mt-1 line-clamp-2 text-sm font-medium text-[color:var(--md-text-primary)]">{assignment.title}</h3>
+                    </div>
+                    <span className="rounded-full bg-[rgba(26,115,232,.10)] px-2 py-1 text-xs font-bold text-[color:var(--md-primary)]">{submission.status || "submitted"}</span>
+                  </div>
+                  <p className="mt-4 text-2xl font-semibold text-[color:var(--md-text-primary)]">{submission.marks ?? "-"} / {assignment.totalMarks}</p>
+                  {submission.feedback && <p className="mt-2 line-clamp-2 text-xs text-[color:var(--md-text-secondary)]">{submission.feedback}</p>}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="py-8 text-center text-sm text-[color:var(--md-text-secondary)]">No assignment marks have been published yet.</p>
+          )}
+        </GlassCard>
 
         <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <motion.div initial="hidden" animate="visible" variants={fadeUp}>

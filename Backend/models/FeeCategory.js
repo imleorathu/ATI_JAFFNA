@@ -6,7 +6,7 @@ const feeCategorySchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      enum: ["Registration Fee", "Course Fee", "Examination Fee", "Library Fee", "Certificate Fee"]
+      enum: ["Registration Fee", "Course Fee", "Assessment Fee", "Library Fee", "Certificate Fee"]
     },
     code: { type: String, required: true, trim: true, uppercase: true, unique: true },
     description: { type: String, trim: true },

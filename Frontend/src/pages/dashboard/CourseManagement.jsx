@@ -48,7 +48,7 @@ function departmentName(departments, id) {
 export default function CourseManagement() {
   const { confirm } = useModal();
   const { user } = useAuth();
-  const isFaculty = String(user?.role || "").toLowerCase() === "lecturer";
+  const isFaculty = ["lecturer", "department_staff"].includes(String(user?.role || "").toLowerCase());
   const [courses, setCourses] = useState([]);
   const [departments] = useState(hndDepartments.map((name) => ({ _id: name, name })));
   const [form, setForm] = useState(emptyForm);

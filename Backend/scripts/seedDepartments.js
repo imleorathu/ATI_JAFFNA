@@ -4,7 +4,7 @@ import Department from "../models/Department.js";
 
 dotenv.config();
 
-const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/ATI_Jaffna";
+const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/ATI_JAFFNA";
 
 const departments = [
   {

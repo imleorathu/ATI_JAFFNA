@@ -1,16 +1,49 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { BookOpen, CheckCircle2, GraduationCap, Mail, MapPin, Phone, UserRound } from "lucide-react";
+import { Bell, BookOpen, CheckCircle2, GraduationCap, Mail, MapPin, Phone, UserRound } from "lucide-react";
 import GlassCard from "../../components/GlassCard";
 import { apiFetch } from "../../lib/api";
 
 const profileFieldClass = "rounded-xl border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-3";
 
+const noticeCategoryClasses = {
+  Urgent: "border-red-200 bg-red-50 text-red-700",
+  Academic: "border-amber-200 bg-amber-50 text-amber-700",
+  Event: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  General: "border-blue-200 bg-blue-50 text-blue-700"
+};
+
+function noticeCategory(notice = {}) {
+  return noticeCategoryClasses[notice.category] ? notice.category : "General";
+}
+
+function noticePriority(notice = {}) {
+  const category = noticeCategory(notice);
+  return (category === "Urgent" ? 3 : 0) + (notice.pinned ? 2 : 0);
+}
+
+function relativeTime(value) {
+  if (!value) return "Recently";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Recently";
+  const diffMs = Date.now() - date.getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes} min${minutes === 1 ? "" : "s"} ago`;
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  if (days === 1) return "Yesterday";
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 export default function FacultyDashboard({ user }) {
   const [students, setStudents] = useState([]);
   const [faculty, setFaculty] = useState(null);
+  const [notices, setNotices] = useState([]);
   const [scope, setScope] = useState("");
   const [loading, setLoading] = useState(true);
+  const [noticesLoading, setNoticesLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -30,6 +63,30 @@ export default function FacultyDashboard({ user }) {
     };
 
     loadDashboard();
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setNoticesLoading(true);
+    apiFetch("/api/notices")
+      .then((items) => {
+        if (!active) return;
+        setNotices(
+          (Array.isArray(items) ? items : [])
+            .sort((a, b) => noticePriority(b) - noticePriority(a) || new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+            .slice(0, 5)
+        );
+      })
+      .catch(() => {
+        if (active) setNotices([]);
+      })
+      .finally(() => {
+        if (active) setNoticesLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const stats = useMemo(
@@ -91,6 +148,54 @@ export default function FacultyDashboard({ user }) {
           </GlassCard>
         ))}
       </div>
+
+      <GlassCard className="student-announcements">
+        <div className="student-announcements-header">
+          <div className="student-announcements-title">
+            <span className="student-announcements-title-icon"><Bell size={20} /></span>
+            <div>
+              <h2>Latest Announcements</h2>
+              <p>{noticesLoading ? "Loading lecturer updates..." : `${notices.length} updates for faculty`}</p>
+            </div>
+          </div>
+        </div>
+
+        {noticesLoading ? (
+          <div className="student-announcements-list">
+            {[0, 1].map((item) => <div key={item} className="student-announcement-skeleton" />)}
+          </div>
+        ) : notices.length ? (
+          <div className="student-announcements-list">
+            {notices.map((notice) => {
+              const category = noticeCategory(notice);
+              return (
+                <article key={notice._id || notice.title} className={`student-announcement-card ${category === "Urgent" ? "student-announcement-urgent" : ""}`}>
+                  <div className="student-announcement-main">
+                    <div className="student-announcement-topline">
+                      <span className={`student-announcement-category ${noticeCategoryClasses[category]}`}>
+                        {category === "Event" ? "Events" : category}
+                      </span>
+                      <span className="student-announcement-new">{notice.audience === "lecturers" ? "Lecturers" : "All"}</span>
+                    </div>
+                    <h3>{notice.title}</h3>
+                    <p>{notice.body}</p>
+                    <div className="student-announcement-meta">
+                      <span>{relativeTime(notice.createdAt)}</span>
+                      <span>ATI Jaffna Admin</span>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="student-announcements-empty">
+            <Bell size={34} />
+            <h3>No lecturer announcements</h3>
+            <p>Notices for all users or lecturers will appear here after admin publishes them.</p>
+          </div>
+        )}
+      </GlassCard>
 
       <GlassCard className="p-5">
         <div className="mb-5 flex items-center justify-between gap-4">

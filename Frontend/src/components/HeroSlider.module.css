@@ -1,0 +1,318 @@
+.slider {
+  position: relative;
+  width: 100%;
+  height: 100svh;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+  background: #05070d;
+  color: #ffffff;
+  touch-action: pan-y;
+}
+
+.slide {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity, transform;
+}
+
+.slideActive {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  user-select: none;
+  pointer-events: none;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(circle at 68% 35%, rgba(99, 102, 241, 0.14), transparent 30%),
+    linear-gradient(90deg, rgba(3, 7, 18, 0.72) 0%, rgba(3, 7, 18, 0.42) 46%, rgba(3, 7, 18, 0.16) 100%),
+    linear-gradient(180deg, rgba(3, 7, 18, 0.08) 0%, rgba(3, 7, 18, 0.7) 100%);
+}
+
+.content {
+  position: relative;
+  z-index: 4;
+  width: min(640px, calc(100vw - 48px));
+  margin-inline: auto;
+  margin-left: max(24px, calc((100vw - 1280px) / 2));
+  padding: 0;
+  will-change: transform, opacity;
+}
+
+.title {
+  margin: 0;
+  max-width: 17ch;
+  font-size: clamp(2rem, 3.8vw, 4.25rem);
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-wrap: balance;
+  text-shadow: 0 18px 54px rgba(0, 0, 0, 0.42);
+}
+
+.subtitle {
+  width: min(540px, 100%);
+  margin: clamp(16px, 2.4vh, 24px) 0 0;
+  font-size: clamp(0.95rem, 1.05vw, 1.12rem);
+  line-height: 1.65;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.78);
+  text-shadow: 0 12px 42px rgba(0, 0, 0, 0.52);
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin-top: clamp(26px, 4vh, 40px);
+  padding: 0 24px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #07111f;
+  font-size: 0.92rem;
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(16px);
+  transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.cta:hover {
+  transform: translateY(-2px);
+  background: #ffffff;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.36);
+}
+
+.gestureLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  cursor: grab;
+}
+
+.gestureLayer:active {
+  cursor: grabbing;
+}
+
+.arrows {
+  position: absolute;
+  right: max(24px, calc((100vw - 1280px) / 2));
+  bottom: clamp(28px, 7vh, 72px);
+  z-index: 5;
+  display: flex;
+  gap: 12px;
+}
+
+.arrowButton {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  cursor: pointer;
+  backdrop-filter: blur(18px);
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
+}
+
+.arrowButton:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.46);
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.dots {
+  position: absolute;
+  left: max(24px, calc((100vw - 1280px) / 2));
+  bottom: clamp(28px, 7vh, 72px);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dot {
+  position: relative;
+  width: 34px;
+  height: 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.24);
+  cursor: pointer;
+  overflow: hidden;
+  transition: width 240ms ease, background 240ms ease;
+}
+
+.dot::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: #ffffff;
+  transform: translateX(-101%);
+  transition: transform 420ms cubic-bezier(0.76, 0, 0.24, 1);
+}
+
+.dotActive {
+  width: 54px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.dotActive::after {
+  transform: translateX(0);
+}
+
+.scrollIndicator {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  z-index: 4;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  margin-left: -21px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(16px);
+}
+
+@media (max-width: 1024px) {
+  .slider {
+    min-height: 100svh;
+  }
+
+  .content {
+    width: min(600px, calc(100vw - 44px));
+    margin-left: 22px;
+    padding: 26px;
+  }
+
+  .title {
+    font-size: clamp(1.9rem, 6vw, 3.75rem);
+  }
+
+  .subtitle {
+    width: min(560px, 100%);
+  }
+
+  .dots {
+    left: 22px;
+  }
+
+  .arrows {
+    right: 22px;
+  }
+}
+
+@media (max-width: 767px) {
+  .slider {
+    min-height: 100svh;
+    touch-action: pan-y;
+  }
+
+  .image {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .overlay {
+    background:
+      linear-gradient(180deg, rgba(3, 7, 18, 0.18) 0%, rgba(3, 7, 18, 0.62) 46%, rgba(3, 7, 18, 0.92) 100%),
+      linear-gradient(90deg, rgba(3, 7, 18, 0.52), rgba(3, 7, 18, 0.24));
+  }
+
+  .content {
+    align-self: end;
+    width: calc(100vw - 40px);
+    margin-inline: auto;
+    margin-left: auto;
+    margin-bottom: 92px;
+    padding: 22px;
+    border-radius: 20px;
+  }
+
+  .title {
+    max-width: 16ch;
+    font-size: clamp(1.75rem, 8.5vw, 3rem);
+  }
+
+  .subtitle {
+    margin-top: 18px;
+    font-size: 0.98rem;
+    line-height: 1.62;
+  }
+
+  .cta {
+    min-height: 46px;
+    margin-top: 24px;
+    padding: 0 20px;
+    font-size: 0.88rem;
+  }
+
+  .arrows {
+    display: none;
+  }
+
+  .dots {
+    left: 20px;
+    bottom: 42px;
+    gap: 9px;
+  }
+
+  .dot {
+    width: 26px;
+    height: 8px;
+  }
+
+  .dotActive {
+    width: 42px;
+  }
+
+  .scrollIndicator {
+    right: 18px;
+    left: auto;
+    bottom: 26px;
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cta,
+  .arrowButton,
+  .dot,
+  .dot::after {
+    transition: none;
+  }
+}

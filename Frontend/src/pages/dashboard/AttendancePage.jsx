@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import jsPDF from "jspdf";
 import {
   BarChart3, CheckCircle, Clock, Download, LocateFixed,
   MapPin, RefreshCw, ShieldCheck, Smartphone, UserCheck, UserX, XCircle
@@ -24,11 +25,15 @@ function uniqueSubjects(records, timetable) {
   ])).sort();
 }
 
+function safeFilenamePart(value) {
+  return String(value || "all").trim().replace(/[^a-z0-9-]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() || "all";
+}
+
 export default function AttendancePage() {
   const { user } = useAuth();
   const role = String(user?.role || "").toLowerCase();
   const isStudent = role === "student";
-  const isFaculty = role === "lecturer";
+  const isFaculty = ["lecturer", "department_staff"].includes(role);
 
   const [session, setSession] = useState(null);
   const [records, setRecords] = useState([]);
@@ -36,6 +41,8 @@ export default function AttendancePage() {
   const [timetable, setTimetable] = useState([]);
   const [selectedDate, setSelectedDate] = useState(today());
   const [selectedSubject, setSelectedSubject] = useState("all");
+  const [selectedAcademicStage, setSelectedAcademicStage] = useState("all");
+  const [studentSearch, setStudentSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [marking, setMarking] = useState(false);
   const [error, setError] = useState("");
@@ -68,6 +75,7 @@ export default function AttendancePage() {
   useEffect(() => { loadData(); }, [selectedDate, selectedSubject]);
 
   const subjects = useMemo(() => uniqueSubjects(records, timetable), [records, timetable]);
+  const academicStages = useMemo(() => Array.from(new Set(students.map((student) => student.academicStage).filter(Boolean))).sort(), [students]);
 
   const studentStats = useMemo(() => ({
     total: records.length,
@@ -80,7 +88,7 @@ export default function AttendancePage() {
     return students.map((s) => {
       const record = records.find((r) => String(r.studentId || "").trim() === String(s.studentId || "").trim());
       return {
-        studentName: s.fullName, studentId: s.studentId, department: s.department,
+        studentName: s.fullName, studentId: s.studentId, department: s.department, academicStage: s.academicStage || "-",
         status: presentIds.has(String(s.studentId || "").trim()) ? "Present" : "Absent",
         subject: record?.subject || (selectedSubject === "all" ? "-" : selectedSubject),
         markedAt: record?.markedAt, distanceMeters: record?.distanceMeters, accuracy: record?.accuracy
@@ -88,9 +96,20 @@ export default function AttendancePage() {
     });
   }, [records, selectedSubject, students]);
 
-  const presentCount = reportRows.filter((r) => r.status === "Present").length;
-  const absentCount = Math.max(0, reportRows.length - presentCount);
-  const percent = reportRows.length ? Math.round((presentCount / reportRows.length) * 100) : 0;
+  const filteredReportRows = useMemo(() => {
+    const query = studentSearch.trim().toLowerCase();
+    return reportRows.filter((row) => {
+      const matchesStage = selectedAcademicStage === "all" || row.academicStage === selectedAcademicStage;
+      const matchesStudent = !query
+        || String(row.studentName || "").toLowerCase().includes(query)
+        || String(row.studentId || "").toLowerCase().includes(query);
+      return matchesStage && matchesStudent;
+    });
+  }, [reportRows, selectedAcademicStage, studentSearch]);
+
+  const presentCount = filteredReportRows.filter((r) => r.status === "Present").length;
+  const absentCount = Math.max(0, filteredReportRows.length - presentCount);
+  const percent = filteredReportRows.length ? Math.round((presentCount / filteredReportRows.length) * 100) : 0;
 
   const markGpsAttendance = async () => {
     if (!navigator.geolocation) { setError("GPS is not available in this browser."); return; }
@@ -113,11 +132,146 @@ export default function AttendancePage() {
   };
 
   const exportReport = () =>
-    downloadCsv("ati-attendance-report.csv", reportRows.map((r) => ({
+    downloadCsv("ati-attendance-report.csv", filteredReportRows.map((r) => ({
       date: selectedDate, subject: r.subject, studentName: r.studentName, studentId: r.studentId,
-      department: r.department, status: r.status, markedAt: r.markedAt ? formatTime(r.markedAt) : "",
+      department: r.department, currentStudyYear: r.academicStage, status: r.status, markedAt: r.markedAt ? formatTime(r.markedAt) : "",
       distanceMeters: r.distanceMeters ?? "", accuracy: r.accuracy ?? ""
     })));
+
+  const downloadReportPdf = () => {
+    if (!filteredReportRows.length) return;
+
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 40;
+    const tableWidth = pageWidth - margin * 2;
+    const generatedAt = new Date().toLocaleString();
+    const subjectLabel = selectedSubject === "all" ? "All subjects" : selectedSubject;
+    const studyYearLabel = selectedAcademicStage === "all" ? "All study years" : selectedAcademicStage;
+    const studentLabel = studentSearch.trim() ? ` | Student search: ${studentSearch.trim()}` : "";
+    const departmentLabel = filteredReportRows.find((row) => row.department)?.department || "Department";
+    const columns = [
+      { label: "Student", key: "studentName", width: 95 },
+      { label: "ID", key: "studentId", width: 55 },
+      { label: "Study Year", key: "academicStage", width: 78 },
+      { label: "Subject", key: "subject", width: 88 },
+      { label: "Status", key: "status", width: 50 },
+      { label: "Distance", key: "distanceMeters", width: 52 },
+      { label: "Accuracy", key: "accuracy", width: 45 },
+      { label: "Marked At", key: "markedAt", width: 52 }
+    ];
+
+    const addHeader = () => {
+      doc.setFillColor(26, 115, 232);
+      doc.rect(0, 0, pageWidth, 78, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.text("ATI Jaffna - Smart Attendance Report", margin, 34);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.text(`Generated: ${generatedAt}`, margin, 54);
+      doc.text(`Date: ${selectedDate}  |  Subject: ${subjectLabel}  |  Study year: ${studyYearLabel}  |  Department: ${departmentLabel}${studentLabel}`, margin, 67);
+    };
+
+    const addFooter = () => {
+      const pageNumber = doc.internal.getNumberOfPages();
+      doc.setTextColor(100, 116, 139);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.text(`Page ${pageNumber}`, pageWidth - margin, pageHeight - 20, { align: "right" });
+    };
+
+    const addTableHeader = (y) => {
+      doc.setFillColor(241, 245, 249);
+      doc.setDrawColor(203, 213, 225);
+      doc.rect(margin, y, tableWidth, 24, "FD");
+      doc.setTextColor(15, 23, 42);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      let x = margin;
+      columns.forEach((column) => {
+        doc.text(column.label, x + 5, y + 15);
+        x += column.width;
+      });
+      return y + 24;
+    };
+
+    const getCellText = (row, key) => {
+      if (key === "distanceMeters") return row.distanceMeters != null ? `${row.distanceMeters}m` : "-";
+      if (key === "accuracy") return row.accuracy ? `${Math.round(row.accuracy)}m` : "-";
+      if (key === "markedAt") return row.markedAt ? formatTime(row.markedAt) : "-";
+      return row[key] || "-";
+    };
+
+    addHeader();
+    addFooter();
+
+    let y = 102;
+    const metricWidth = (tableWidth - 20) / 3;
+    [
+      ["Present", presentCount, [22, 163, 74]],
+      ["Absent", absentCount, [220, 38, 38]],
+      ["Attendance", `${percent}%`, [26, 115, 232]]
+    ].forEach(([label, value, color], index) => {
+      const x = margin + index * (metricWidth + 10);
+      doc.setDrawColor(226, 232, 240);
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(x, y, metricWidth, 48, 8, 8, "FD");
+      doc.setTextColor(100, 116, 139);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.text(label, x + 12, y + 17);
+      doc.setTextColor(...color);
+      doc.setFontSize(18);
+      doc.text(String(value), x + 12, y + 38);
+    });
+
+    y += 72;
+    y = addTableHeader(y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+
+    filteredReportRows.forEach((row, index) => {
+      const wrapped = columns.map((column) => doc.splitTextToSize(String(getCellText(row, column.key)), column.width - 10));
+      const rowHeight = Math.max(24, ...wrapped.map((lines) => lines.length * 9 + 12));
+
+      if (y + rowHeight > pageHeight - 38) {
+        doc.addPage();
+        addHeader();
+        addFooter();
+        y = addTableHeader(96);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+      }
+
+      const shade = index % 2 === 0 ? 255 : 248;
+      doc.setFillColor(shade, index % 2 === 0 ? 255 : 250, index % 2 === 0 ? 255 : 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(margin, y, tableWidth, rowHeight, "FD");
+
+      let x = margin;
+      wrapped.forEach((lines, columnIndex) => {
+        const column = columns[columnIndex];
+        if (column.key === "status") {
+          const isPresent = row.status === "Present";
+          doc.setTextColor(isPresent ? 22 : 220, isPresent ? 163 : 38, isPresent ? 74 : 38);
+          doc.setFont("helvetica", "bold");
+        } else {
+          doc.setTextColor(30, 41, 59);
+          doc.setFont("helvetica", "normal");
+        }
+        doc.text(lines, x + 5, y + 14);
+        x += column.width;
+      });
+
+      y += rowHeight;
+    });
+
+    doc.save(`ati-attendance-${selectedDate}-${safeFilenamePart(subjectLabel)}.pdf`);
+    setStatus("Attendance PDF downloaded.");
+  };
 
   if (!isStudent && !isFaculty && role !== "admin") {
     return (
@@ -264,13 +418,17 @@ export default function AttendancePage() {
           <button type="button" onClick={loadData} className="portal-btn">
             <RefreshCw size={15} className={loading ? "animate-spin" : ""} /> Refresh
           </button>
-          <button type="button" onClick={exportReport} disabled={!reportRows.length} className="portal-btn">
-            <Download size={15} /> Export
+          <button type="button" onClick={exportReport} disabled={!filteredReportRows.length} className="portal-btn">
+            <Download size={15} /> Export CSV
+          </button>
+          <button type="button" onClick={downloadReportPdf} disabled={!filteredReportRows.length} className="portal-btn-primary">
+            <Download size={15} /> Download PDF
           </button>
         </div>
       </div>
 
       {error && <div className="portal-alert-danger">{error}</div>}
+      {status && <div className="portal-alert-success">{status}</div>}
 
       {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-3">
@@ -291,41 +449,62 @@ export default function AttendancePage() {
 
       {/* Filters */}
       <GlassCard className="p-4">
-        <div className="grid gap-3 lg:grid-cols-[200px_1fr]">
+        <div className="grid gap-3 lg:grid-cols-[180px_1fr_1fr_1.2fr]">
           <label className="space-y-1">
             <span className="portal-card-label">Date</span>
             <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="portal-input" />
           </label>
           <label className="space-y-1">
-            <span className="portal-card-label">Subject</span>
+            <span className="portal-card-label">Subjects</span>
             <select value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)} className="portal-input">
               <option value="all">All subjects</option>
               {subjects.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </label>
+          <label className="space-y-1">
+            <span className="portal-card-label">Current Study Year</span>
+            <select value={selectedAcademicStage} onChange={(e) => setSelectedAcademicStage(e.target.value)} className="portal-input">
+              <option value="all">All study years</option>
+              {academicStages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
+            </select>
+          </label>
+          <label className="space-y-1">
+            <span className="portal-card-label">Search Student</span>
+            <input
+              type="search"
+              value={studentSearch}
+              onChange={(e) => setStudentSearch(e.target.value)}
+              className="portal-input"
+              placeholder="Name or Student ID"
+            />
+          </label>
         </div>
+        <p className="mt-3 text-xs font-semibold" style={{ color: "var(--md-text-secondary)" }}>
+          Showing {filteredReportRows.length} of {reportRows.length} department students for the selected subject, current study year, and student search.
+        </p>
       </GlassCard>
 
       {/* Report Table */}
       <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}>
         <div className="portal-table-wrap">
-          <table className="portal-table" style={{ minWidth: 860 }}>
+          <table className="portal-table" style={{ minWidth: 980 }}>
             <thead>
               <tr>
-                {["Student", "Student ID", "Subject", "Status", "GPS Distance", "Accuracy", "Marked At"].map((h) => (
+                {["Student", "Student ID", "Current Study Year", "Subject", "Status", "GPS Distance", "Accuracy", "Marked At"].map((h) => (
                   <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="py-8 text-center" style={{ color: "var(--md-text-secondary)" }}>Loading attendance report…</td></tr>
-              ) : reportRows.length === 0 ? (
-                <tr><td colSpan={7} className="py-8 text-center" style={{ color: "var(--md-text-secondary)" }}>No students found for your department.</td></tr>
-              ) : reportRows.map((row) => (
-                <tr key={`${row.studentId}-${row.subject}`}>
+                <tr><td colSpan={8} className="py-8 text-center" style={{ color: "var(--md-text-secondary)" }}>Loading attendance report…</td></tr>
+              ) : filteredReportRows.length === 0 ? (
+                <tr><td colSpan={8} className="py-8 text-center" style={{ color: "var(--md-text-secondary)" }}>No students match the selected filters.</td></tr>
+              ) : filteredReportRows.map((row) => (
+                <tr key={`${row.studentId}-${row.academicStage}-${row.subject}`}>
                   <td className="font-medium">{row.studentName}</td>
                   <td>{row.studentId || "-"}</td>
+                  <td>{row.academicStage || "-"}</td>
                   <td>{row.subject}</td>
                   <td>
                     <span className={`portal-badge ${row.status === "Present" ? "portal-badge-success" : "portal-badge-danger"}`}>

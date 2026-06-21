@@ -20,7 +20,6 @@ import CourseManagement from "./pages/dashboard/CourseManagement.jsx";
 import CmsManagement from "./pages/dashboard/CmsManagement.jsx";
 import TimetablePage from "./pages/dashboard/TimetablePage.jsx";
 import AttendancePage from "./pages/dashboard/AttendancePage.jsx";
-import ExamsPage from "./pages/dashboard/ExamsPage.jsx";
 import GradesPage from "./pages/dashboard/GradesPage.jsx";
 import AssignmentsPage from "./pages/dashboard/AssignmentsPage.jsx";
 import FeesPage from "./pages/dashboard/FeesPage.jsx";
@@ -111,6 +110,7 @@ function AdminRoutes() {
         <Route path="users" element={<UserManagement />} />
         <Route path="students" element={<StudentManagement />} />
         <Route path="faculty" element={<FacultyManagement />} />
+        <Route path="courses" element={<CourseManagement />} />
         <Route path="cms" element={<CmsManagement />} />
         <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="ai-assistant" element={<AIAssistant />} />
@@ -134,14 +134,12 @@ function FacultyRoutes() {
       <Routes>
         <Route path="" element={<FacultyDashboard user={user} />} />
         <Route path="students" element={<StudentManagement />} />
-        <Route path="my-classes" element={<CourseManagement />} />
         <Route path="timetable" element={<TimetablePage />} />
         <Route path="attendance" element={<AttendancePage />} />
         <Route path="grades" element={<GradesPage />} />
         <Route path="fees" element={<FeesPage />} />
         <Route path="assignments" element={<AssignmentsPage />} />
         <Route path="ai-assistant" element={<AIAssistant />} />
-        <Route path="exams" element={<ExamsPage />} />
         <Route path="messages" element={<MessagesPage />} />
         <Route path="*" element={<Navigate to="/faculty" replace />} />
       </Routes>

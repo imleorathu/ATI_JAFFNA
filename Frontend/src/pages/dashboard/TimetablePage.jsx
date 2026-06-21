@@ -68,8 +68,8 @@ export default function TimetablePage() {
   const { confirm } = useModal();
   const { user } = useAuth();
   const role = String(user?.role || "").toLowerCase();
-  const canManage = ["admin","lecturer"].includes(role);
-  const isFaculty = role === "lecturer";
+  const canManage = ["admin", "lecturer", "department_staff"].includes(role);
+  const isFaculty = ["lecturer", "department_staff"].includes(role);
   const [selectedDay, setSelectedDay] = useState(getCurrentDayIndex());
   const [entries, setEntries] = useState([]);
   const [form, setForm] = useState(emptyForm);

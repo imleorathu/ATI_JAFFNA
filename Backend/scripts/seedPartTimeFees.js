@@ -17,7 +17,7 @@ dotenv.config();
 const categories = [
   ["Registration Fee", "REG"],
   ["Course Fee", "COURSE"],
-  ["Examination Fee", "EXAM"],
+  ["Assessment Fee", "ASSESS"],
   ["Library Fee", "LIB"],
   ["Certificate Fee", "CERT"]
 ];

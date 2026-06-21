@@ -6,7 +6,7 @@ import Faculty from "../models/Faculty.js";
 import User from "../models/User.js";
 import { adminProfileFromPayload, staffProfileFromPayload } from "../services/userProfileService.js";
 
-const uri = process.env.MONGO_URI || process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/ATI_Jaffna";
+const uri = process.env.MONGO_URI || process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/ATI_JAFFNA";
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 const isEmptyProfile = (profile) => !profile || Object.values(profile).every((value) => value === undefined || value === null || value === "");
 

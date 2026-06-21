@@ -7,6 +7,7 @@ import {
   ArrowUpRight,
   BarChart3,
   Bell,
+  BookOpen,
   Building2,
   CheckCircle2,
   Download,
@@ -28,6 +29,7 @@ import { useModal } from "../../contexts/ModalContext.jsx";
 const resources = [
   { key: "users", path: "/api/users" },
   { key: "students", path: "/api/students" },
+  { key: "courses", path: "/api/courses" },
   { key: "departments", path: "/api/departments" },
   { key: "blogs", path: "/api/blogs" },
   { key: "notices", path: "/api/notices" },
@@ -44,7 +46,8 @@ const emptyData = resources.reduce((acc, resource) => ({ ...acc, [resource.key]:
 const initialNoticeForm = {
   title: "",
   body: "",
-  audience: "all"
+  audience: "all",
+  category: "General"
 };
 const initialBlogForm = {
   title: "",
@@ -188,6 +191,7 @@ export default function AdminDashboard({ user }) {
   const quickActions = [
     { title: "Students", detail: "Add and manage student records", icon: GraduationCap, route: "/admin/students", count: dashboardCount(data, "students") },
     { title: "Faculty", detail: "Review staff directory", icon: Users, route: "/admin/faculty", count: "Directory" },
+    { title: "Courses", detail: "Edit public database course cards", icon: BookOpen, route: "/admin/courses", count: dashboardCount(data, "courses") },
     { title: "Website CMS", detail: "Customize public pages", icon: FilePenLine, route: "/admin/cms", count: dashboardCount(data, "blogs") },
     { title: "Analytics", detail: "Open reports and charts", icon: BarChart3, route: "/admin/analytics", count: "Reports" },
     { title: "Messages", detail: "Read contact requests", icon: Mail, route: "/admin/messages", count: dashboardCount(data, "contacts") },
@@ -457,6 +461,16 @@ export default function AdminDashboard({ user }) {
               />
               <div className="flex flex-col gap-3 sm:flex-row">
                 <select
+                  value={noticeForm.category}
+                  onChange={(event) => setNoticeForm((current) => ({ ...current, category: event.target.value }))}
+                  className="portal-input sm:w-44"
+                >
+                  <option value="Urgent">Urgent</option>
+                  <option value="Academic">Academic</option>
+                  <option value="Event">Events</option>
+                  <option value="General">General</option>
+                </select>
+                <select
                   value={noticeForm.audience}
                   onChange={(event) => setNoticeForm((current) => ({ ...current, audience: event.target.value }))}
                   className="portal-input sm:w-44"
@@ -485,7 +499,7 @@ export default function AdminDashboard({ user }) {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-[color:var(--md-text-primary)]">{notice.title}</p>
                       <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--md-text-secondary)]">{notice.body}</p>
-                      <p className="mt-1 text-xs capitalize text-[color:var(--md-text-secondary)]">{notice.audience || "all"} | {formatDate(notice.createdAt)}</p>
+                      <p className="mt-1 text-xs text-[color:var(--md-text-secondary)]">{notice.category || "General"} | {notice.audience || "all"} | {formatDate(notice.createdAt)}</p>
                     </div>
                     <button
                       type="button"

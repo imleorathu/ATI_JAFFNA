@@ -6,7 +6,6 @@ import {
   addAssignmentComment,
   createAssignment,
   deleteAssignment,
-  duplicateAssignment,
   listAssignments,
   reviewSubmission,
   submitAssignment,
@@ -33,7 +32,6 @@ const upload = multer({
 router.get("/", requireAuth, listAssignments);
 router.post("/uploads", requireAuth, upload.array("files", 10), uploadAssignmentFiles);
 router.post("/", requireAuth, createAssignment);
-router.post("/:id/duplicate", requireAuth, duplicateAssignment);
 router.post("/:id/comments", requireAuth, addAssignmentComment);
 router.post("/:id/submissions", requireAuth, submitAssignment);
 router.put("/:id/submissions/:submissionId", requireAuth, reviewSubmission);
