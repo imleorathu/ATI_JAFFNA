@@ -17,7 +17,7 @@ import setupGracefulShutdown from "./lib/gracefulShutdown.js";
 // Middleware
 import errorHandler from "./middleware/errorHandler.js";
 import requestLogger from "./middleware/requestLogger.js";
-import { createSecurityHeaders } from "./middleware/security.js";
+import { createSecurityHeaders, sanitizeRequestData } from "./middleware/security.js";
 import { generalLimiter } from "./middleware/rateLimiter.js";
 import { requestId } from "./middleware/requestId.js";
 
@@ -112,6 +112,7 @@ app.use(
 // Body size limits to prevent DoS
 app.use(express.json({ limit: config.maxJsonBody }));
 app.use(express.urlencoded({ extended: true, limit: config.maxJsonBody }));
+app.use(sanitizeRequestData());
 
 // Custom NoSQL injection prevention (compatible with Express 5 getter-only query)
 app.use((req, res, next) => {
@@ -363,7 +364,7 @@ const ensureDefaultAdmin = async () => {
     await existingDefaultAdmin.save();
     logger.info("Default admin account ready", { email });
 
-    if (config.nodeEnv === "production" && password === "123456") {
+    if (config.nodeEnv === "production" && ["123456", "Admin@12345"].includes(password)) {
       logger.warn("Default admin password is being used. Change it immediately!");
     }
     return;
@@ -387,7 +388,7 @@ const ensureDefaultAdmin = async () => {
 
   logger.info("Created default admin account", { email });
 
-  if (config.nodeEnv === "production" && password === "123456") {
+  if (config.nodeEnv === "production" && ["123456", "Admin@12345"].includes(password)) {
     logger.warn("Default admin password is being used. Change it immediately!");
   }
 };

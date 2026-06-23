@@ -1,33 +1,19 @@
 import { Router } from "express";
 import fs from "fs";
-import multer from "multer";
 import path from "path";
 import { getPublishedPage, listPages, publishPage, saveDraft, unpublishPage } from "../controllers/pageContentController.js";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
+import { createDiskUpload } from "../middleware/upload.js";
 
 const router = Router();
 const adminOnly = [requireAuth, requireAdmin];
 const uploadDir = path.resolve("uploads/cms");
 fs.mkdirSync(uploadDir, { recursive: true });
 
-const upload = multer({
-  storage: multer.diskStorage({
-    destination(req, file, callback) {
-      callback(null, uploadDir);
-    },
-    filename(req, file, callback) {
-      const safeName = file.originalname.replace(/[^a-z0-9.]+/gi, "-").toLowerCase();
-      callback(null, `${Date.now()}-${safeName}`);
-    }
-  }),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter(req, file, callback) {
-    if (/^image\/(png|jpe?g|webp|gif)$/i.test(file.mimetype)) {
-      callback(null, true);
-      return;
-    }
-    callback(new Error("Only image files are allowed."));
-  }
+const upload = createDiskUpload({
+  uploadDir,
+  groupName: "cmsImage",
+  maxFileSize: 5 * 1024 * 1024
 });
 
 router.get("/public/pages/:slug", getPublishedPage);

@@ -24,6 +24,7 @@ import noticeRoutes from "./noticeRoutes.js";
 import partTimeFeesRoutes from "./partTimeFeesRoutes.js";
 import portalDataRoutes from "./portalDataRoutes.js";
 import userRoutes from "./userRoutes.js";
+import donationRoutes from "./donationRoutes.js";
 
 const router = Router();
 
@@ -222,6 +223,7 @@ router.use("/auth", authRoutes);
 router.use("/cms", pageContentRoutes);
 router.use("/portal-data", portalDataRoutes);
 router.use("/part-time-fees", partTimeFeesRoutes);
+router.use("/donations", donationRoutes);
 router.use("/settings", settingsRoutes);
 router.use("/ai", aiRoutes);
 router.use("/assignments", assignmentRoutes);

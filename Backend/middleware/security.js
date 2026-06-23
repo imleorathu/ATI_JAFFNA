@@ -28,6 +28,23 @@ function sanitizeObject(obj, excludeFields = new Set()) {
   return sanitized;
 }
 
+function scrubUnsafeKeys(value) {
+  if (!value || typeof value !== "object") return value;
+  if (Array.isArray(value)) {
+    value.forEach(scrubUnsafeKeys);
+    return value;
+  }
+
+  for (const key of Object.keys(value)) {
+    if (key.startsWith("$") || key.includes(".")) {
+      delete value[key];
+      continue;
+    }
+    scrubUnsafeKeys(value[key]);
+  }
+  return value;
+}
+
 function createSecurityHeaders() {
   return (req, res, next) => {
     res.set("X-Content-Type-Options", "nosniff");
@@ -46,6 +63,15 @@ function sanitizeBody(excludeFields = []) {
     if (req.body && typeof req.body === "object") {
       req.body = sanitizeObject(req.body, exclude);
     }
+    next();
+  };
+}
+
+function sanitizeRequestData() {
+  return (req, _res, next) => {
+    if (req.body && typeof req.body === "object") scrubUnsafeKeys(req.body);
+    if (req.params && typeof req.params === "object") scrubUnsafeKeys(req.params);
+    if (req.query && typeof req.query === "object") scrubUnsafeKeys(req.query);
     next();
   };
 }
@@ -86,4 +112,4 @@ function createValidationMiddleware(validators) {
   };
 }
 
-export { createSecurityHeaders, sanitizeBody, validatePassword, validateEmail, createValidationMiddleware, sanitizeInput };
+export { createSecurityHeaders, sanitizeBody, sanitizeRequestData, validatePassword, validateEmail, createValidationMiddleware, sanitizeInput };

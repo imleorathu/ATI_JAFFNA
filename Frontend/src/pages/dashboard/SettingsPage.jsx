@@ -68,13 +68,25 @@ const sections = [
 ];
 
 function mergeSettings(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const objectOrEmpty = (section) => (section && typeof section === "object" && !Array.isArray(section) ? section : {});
   return {
-    general: { ...defaults.general, ...(value.general || {}) },
-    notifications: { ...defaults.notifications, ...(value.notifications || {}) },
-    security: { ...defaults.security, ...(value.security || {}) },
-    academic: { ...defaults.academic, ...(value.academic || {}) },
-    integrations: { ...defaults.integrations, ...(value.integrations || {}) }
+    general: { ...defaults.general, ...objectOrEmpty(source.general) },
+    notifications: { ...defaults.notifications, ...objectOrEmpty(source.notifications) },
+    security: { ...defaults.security, ...objectOrEmpty(source.security) },
+    academic: { ...defaults.academic, ...objectOrEmpty(source.academic) },
+    integrations: { ...defaults.integrations, ...objectOrEmpty(source.integrations) }
   };
+}
+
+function readJsonStorage(key, fallback) {
+  try {
+    const value = localStorage.getItem(key);
+    return value ? JSON.parse(value) : fallback;
+  } catch {
+    localStorage.removeItem(key);
+    return fallback;
+  }
 }
 
 function Toggle({ enabled, onChange }) {
@@ -149,7 +161,7 @@ export default function SettingsPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [auditLog, setAuditLog] = useState(() => JSON.parse(localStorage.getItem("atiSettingsAudit") || "[]"));
+  const [auditLog, setAuditLog] = useState(() => readJsonStorage("atiSettingsAudit", []));
   const importRef = useRef(null);
 
   const activeMeta = sections.find((section) => section.id === activeSection) || sections[0];
@@ -176,7 +188,7 @@ export default function SettingsPage() {
     } catch (err) {
       const cached = localStorage.getItem("atiAdminSettings");
       if (cached) {
-        setSettings(mergeSettings(JSON.parse(cached)));
+        setSettings(mergeSettings(readJsonStorage("atiAdminSettings", defaults)));
         setStatus("Loaded saved browser copy. Server settings were unavailable.");
       } else {
         setError(err?.message || "Unable to load settings.");
@@ -228,6 +240,7 @@ export default function SettingsPage() {
       localStorage.setItem("atiAdminSettings", JSON.stringify(merged));
       setStatus(`Saved ${label}.`);
       addAudit(`Saved ${label}`);
+      window.dispatchEvent(new Event("ati-settings-updated"));
     } catch (err) {
       localStorage.setItem("atiAdminSettings", JSON.stringify(settings));
       setError(err?.message || "Saved browser copy only. Server save failed.");
@@ -239,9 +252,23 @@ export default function SettingsPage() {
   const resetDefaults = async () => {
     const confirmed = await confirm({ title: "Reset settings?", message: "Restore every system setting to its default value?", confirmLabel: "Reset defaults", tone: "warning" });
     if (!confirmed) return;
-    setSettings(defaults);
-    setStatus("Defaults restored. Save to apply them.");
-    addAudit("Reset settings to defaults");
+    setSaving(true);
+    setError("");
+    try {
+      const saved = await apiFetch("/api/settings/reset", { method: "POST" });
+      const merged = mergeSettings(saved);
+      setSettings(merged);
+      localStorage.setItem("atiAdminSettings", JSON.stringify(merged));
+      setStatus("Defaults restored and saved.");
+      addAudit("Reset settings to defaults");
+      window.dispatchEvent(new Event("ati-settings-updated"));
+    } catch (err) {
+      setSettings(defaults);
+      localStorage.setItem("atiAdminSettings", JSON.stringify(defaults));
+      setError(err?.message || "Defaults restored in browser only. Server reset failed.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const exportJson = () => {
@@ -279,7 +306,8 @@ export default function SettingsPage() {
     try {
       const text = await file.text();
       const parsed = JSON.parse(text);
-      const imported = parsed.settings ? parsed.settings : parsed;
+      const imported = parsed && typeof parsed === "object" && parsed.settings ? parsed.settings : parsed;
+      if (!imported || typeof imported !== "object" || Array.isArray(imported)) throw new Error("Invalid settings shape.");
       setSettings(mergeSettings(imported));
       setStatus("Settings imported. Save to apply them.");
       addAudit(`Imported ${file.name}`);
@@ -290,9 +318,19 @@ export default function SettingsPage() {
     }
   };
 
-  const testIntegration = (name) => {
-    setStatus(`Test successful for ${name}.`);
-    addAudit(`Tested ${name}`);
+  const testIntegration = async (type, name) => {
+    setError("");
+    setStatus("");
+    try {
+      const result = await apiFetch("/api/settings/integrations/test", {
+        method: "POST",
+        body: JSON.stringify({ type, provider: name })
+      });
+      setStatus(result?.message || `Test successful for ${name}.`);
+      addAudit(`Tested ${name}`);
+    } catch (err) {
+      setError(err?.message || `Unable to test ${name}.`);
+    }
   };
 
   const clearBrowserCache = () => {
@@ -450,15 +488,15 @@ export default function SettingsPage() {
               </div>
               <SwitchRow title="Maintenance Mode" description="Show admins that the public portal is under maintenance." enabled={settings.integrations.maintenanceMode} onChange={() => updateSection("integrations", "maintenanceMode", !settings.integrations.maintenanceMode)} />
               <div className="grid gap-3 sm:grid-cols-3">
-                <button type="button" onClick={() => testIntegration(settings.integrations.paymentGateway)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[color:var(--md-hover)] px-3 py-2 text-sm font-bold text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)]">
+                <button type="button" onClick={() => testIntegration("payment", settings.integrations.paymentGateway)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[color:var(--md-hover)] px-3 py-2 text-sm font-bold text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)]">
                   <Wifi size={16} />
                   Test Payment
                 </button>
-                <button type="button" onClick={() => testIntegration(settings.integrations.smsGateway)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[color:var(--md-hover)] px-3 py-2 text-sm font-bold text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)]">
+                <button type="button" onClick={() => testIntegration("sms", settings.integrations.smsGateway)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[color:var(--md-hover)] px-3 py-2 text-sm font-bold text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)]">
                   <Wifi size={16} />
                   Test SMS
                 </button>
-                <button type="button" onClick={() => testIntegration(settings.integrations.emailServer)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[color:var(--md-hover)] px-3 py-2 text-sm font-bold text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)]">
+                <button type="button" onClick={() => testIntegration("email", settings.integrations.emailServer)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[color:var(--md-hover)] px-3 py-2 text-sm font-bold text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)]">
                   <Wifi size={16} />
                   Test Email
                 </button>

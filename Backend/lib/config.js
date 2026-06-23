@@ -9,7 +9,7 @@ const OPTIONAL_VARS = {
   LOG_LEVEL: undefined,
   SEED_DEFAULT_ADMIN: "true",
   DEFAULT_ADMIN_EMAIL: "admin@gmail.com",
-  DEFAULT_ADMIN_PASSWORD: "123456",
+  DEFAULT_ADMIN_PASSWORD: "Admin@12345",
   DEFAULT_ADMIN_NAME: "ATI Jaffna Admin",
   GROQ_API_KEY: undefined,
   GROQ_MODEL: "llama-3.3-70b-versatile",

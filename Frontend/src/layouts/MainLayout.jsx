@@ -28,6 +28,7 @@ const navItems = [
   { label: "Faculties", path: "/faculties" },
   { label: "Courses", path: "/courses" },
   { label: "News", path: "/news" },
+  { label: "Donation", path: "/donation-wall" },
   { label: "Contact", path: "/contact" }
 ];
 
@@ -117,11 +118,12 @@ export default function MainLayout() {
   }, [isAuthenticated, user]);
 
   const isHomePage = location.pathname === "/";
+  const isHeroNavPage = isHomePage || location.pathname === "/donation-wall";
   const isAuthPage = ["/login", "/register"].some((path) => location.pathname === path);
-  const isNavbarVisible = !isHomePage || hasScrolledHome;
+  const isNavbarVisible = !isHeroNavPage || hasScrolledHome;
 
   const navbarStyle = useMemo(() => {
-    if (!isHomePage) return undefined;
+    if (!isHeroNavPage) return undefined;
 
     const progress = clamp(homeNavProgress);
     const isDarkTheme = themeMode === "dark";
@@ -184,7 +186,7 @@ export default function MainLayout() {
       "--site-nav-shadow": `0 ${mix(16, isDarkTheme ? 12 : 1, progress)}px ${mix(38, isDarkTheme ? 34 : 0, progress)}px rgba(2, 6, 23, ${mixAlpha(heroPalette.shadowAlpha, settledPalette.shadowAlpha, progress)})`,
       "--site-nav-active": rgbaMix(heroPalette.active, settledPalette.active, progress)
     };
-  }, [homeNavProgress, isHomePage, themeMode]);
+  }, [homeNavProgress, isHeroNavPage, themeMode]);
 
   const headerStyle = useMemo(() => ({
     ...(navbarStyle || {}),
@@ -197,11 +199,11 @@ export default function MainLayout() {
   }, [open]);
 
   useEffect(() => {
-    const isHomePage = location.pathname === "/";
+    const isHeroNavPage = location.pathname === "/" || location.pathname === "/donation-wall";
     let frameId = 0;
 
     const calculateProgress = () => {
-      if (!isHomePage) return 1;
+      if (!isHeroNavPage) return 1;
 
       const transitionLength = Math.min(340, window.innerHeight * 0.32);
       const transitionStart = window.innerHeight - transitionLength;
@@ -211,7 +213,7 @@ export default function MainLayout() {
     const updateNavbarMode = () => {
       frameId = 0;
       const nextProgress = calculateProgress();
-      setHasScrolledHome(!isHomePage || window.scrollY > 12);
+      setHasScrolledHome(!isHeroNavPage || window.scrollY > 12);
       setHomeNavProgress((current) => (Math.abs(current - nextProgress) < 0.005 ? current : nextProgress));
     };
 
@@ -252,7 +254,7 @@ export default function MainLayout() {
           scale: isNavbarVisible ? 1 : 0.96
         }}
         transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-        className={`site-clean-navbar fixed inset-x-0 top-0 z-50 ${isHomePage ? "home-hero-navbar" : ""}`}
+        className={`site-clean-navbar fixed inset-x-0 top-0 z-50 ${isHeroNavPage ? "home-hero-navbar" : ""}`}
         style={headerStyle}
       >
         <motion.nav
@@ -414,7 +416,7 @@ export default function MainLayout() {
           )}
         </AnimatePresence>
       </motion.header>
-      <main className={`${isHomePage ? "" : "pt-[90px]"} ${isAuthPage ? "auth-page-main" : ""}`}>
+      <main className={`${isHeroNavPage ? "" : "pt-[90px]"} ${isAuthPage ? "auth-page-main" : ""}`}>
         <Outlet />
       </main>
       <footer className="mt-8 border-t border-white/10 bg-slate-950 px-4 py-10 text-white">

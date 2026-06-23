@@ -16,6 +16,8 @@
     "test:department-access": "node --test tests/departmentAccess.test.js",
     "test:fee-access": "node --test tests/feeAccess.test.js",
     "test:notice-audience": "node --test tests/noticeAudience.test.js",
+    "test:security": "node --test tests/securityMiddleware.test.js tests/uploadSecurity.test.js",
+    "test:all": "node --test tests/*.test.js",
     "db:migrate-case": "node scripts/migrateDatabaseCase.js",
     "db:indexes": "node models/indexes.js"
   },

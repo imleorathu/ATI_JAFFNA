@@ -73,7 +73,7 @@ try {
   const totalStudentUsers = await User.countDocuments({ role: "student" });
 
   console.log(`Database: ${mongoose.connection.name}`);
-  console.log(`Password set to: ${password}`);
+  console.log("Password reset completed. The plaintext password is intentionally not printed.");
   console.log(`TEST student profiles found: ${testStudents.length}`);
   console.log(`TEST student login accounts created: ${created}`);
   console.log(`TEST student login accounts updated/linked: ${linkedOrUpdated}`);

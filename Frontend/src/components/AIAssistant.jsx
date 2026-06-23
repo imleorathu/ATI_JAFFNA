@@ -128,22 +128,43 @@ function nextId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function renderInlineMarkdown(text, keyPrefix) {
+  const segments = String(text || "").split(/(\*\*[^*]+\*\*|`[^`]+`)/g).filter((segment) => segment !== "");
+  if (!segments.length) return "\u00a0";
+
+  return segments.map((segment, index) => {
+    const key = `${keyPrefix}-${index}`;
+    if (segment.startsWith("**") && segment.endsWith("**")) {
+      return <strong key={key}>{segment.slice(2, -2)}</strong>;
+    }
+    if (segment.startsWith("`") && segment.endsWith("`")) {
+      return (
+        <code key={key} className="ai-chat-inline-code">
+          {segment.slice(1, -1)}
+        </code>
+      );
+    }
+    return <span key={key}>{segment}</span>;
+  });
+}
+
 function renderMarkdown(text) {
   const parts = String(text || "").split(/(```[\s\S]*?```)/g);
   return parts.map((part, index) => {
     if (part.startsWith("```")) {
       const code = part.replace(/^```[a-zA-Z0-9]*\n?/, "").replace(/```$/, "");
       return (
-        <pre key={index} className="my-3 overflow-x-auto rounded-lg border border-[color:var(--md-border)] bg-slate-950 p-3 text-xs text-sky-100">
+        <pre key={index} className="ai-chat-code-block">
           <code>{code}</code>
         </pre>
       );
     }
     return part.split("\n").map((line, lineIndex) => {
-      const html = line
-        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-        .replace(/`([^`]+)`/g, "<code class='rounded bg-black/20 px-1 py-0.5 text-sky-200'>$1</code>");
-      return <p key={`${index}-${lineIndex}`} className="mb-2" dangerouslySetInnerHTML={{ __html: html || "&nbsp;" }} />;
+      return (
+        <p key={`${index}-${lineIndex}`} className="mb-2">
+          {renderInlineMarkdown(line, `${index}-${lineIndex}`)}
+        </p>
+      );
     });
   });
 }
@@ -528,8 +549,8 @@ function ChatSurface({ compact = false, activeDocument = null, allowStudentDocum
   };
 
   return (
-    <div className={`flex min-h-0 flex-col overflow-hidden ${compact ? "h-full" : isStaff ? "ai-staff-chat-shell" : "h-[calc(100vh-220px)] rounded-lg border border-[color:var(--md-border)] bg-[#0f172a]/80"}`}>
-      <div className="border-b border-[color:var(--md-border)] bg-[color:var(--md-hover)] p-4">
+    <div className={`ai-chat-shell flex min-h-0 flex-col overflow-hidden ${compact ? "h-full" : isStaff ? "ai-staff-chat-shell" : "h-[calc(100vh-220px)] rounded-lg border border-[color:var(--md-border)] bg-[#0f172a]/80"}`}>
+      <div className="ai-chat-header border-b border-[color:var(--md-border)] p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-sky-500 text-slate-950">
@@ -537,18 +558,20 @@ function ChatSurface({ compact = false, activeDocument = null, allowStudentDocum
             </div>
             <div>
               <h2 className="text-sm font-black text-[color:var(--md-text-primary)]">
-                {isStaff ? "ATI Buddy Pro - Staff AI Assistant" : "ATI Buddy Pro - Personalized Student Copilot"}
+                {role === "admin" ? "ATI Buddy Pro - Admin RAG Assistant" : isStaff ? "ATI Buddy Pro - Staff AI Assistant" : "ATI Buddy Pro - Personalized Student Copilot"}
               </h2>
-              <p className="text-xs text-[color:var(--md-text-secondary)]">
+              <p className="ai-chat-muted text-xs">
                 {activeDocument
                   ? `Reading selected file: ${activeDocument.title}`
-                  : isStaff
+                  : role === "admin"
+                    ? "Admin RAG assistant for policies, knowledge files, assignments, reports, analytics, and portal operations"
+                    : isStaff
                     ? "Staff AI assistant for RAG policies, assignments, attendance analytics, student risk, documents, and communication drafts"
                     : "ChatGPT-style help using portal context, student records, timetable, grades, deadlines, and RAG documents"}
               </p>
             </div>
           </div>
-          <button type="button" onClick={clearHistory} className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] px-3 py-2 text-xs font-bold text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)]">
+          <button type="button" onClick={clearHistory} className="ai-chat-secondary-button inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold">
             <Trash2 size={14} />
             Clear
           </button>
@@ -556,7 +579,7 @@ function ChatSurface({ compact = false, activeDocument = null, allowStudentDocum
         {!compact && (
           <div className="mt-4 flex gap-2 overflow-x-auto">
             {(isStaff ? staffQuickPrompts : quickPrompts).map((prompt) => (
-              <button key={prompt} type="button" onClick={() => submit(prompt)} className="shrink-0 rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] px-3 py-2 text-xs font-bold text-[color:var(--md-text-secondary)] hover:border-sky-400/50 hover:bg-sky-400/10">
+              <button key={prompt} type="button" onClick={() => submit(prompt)} className="ai-chat-prompt-button shrink-0 rounded-lg px-3 py-2 text-xs font-bold">
                 {prompt}
               </button>
             ))}
@@ -573,7 +596,7 @@ function ChatSurface({ compact = false, activeDocument = null, allowStudentDocum
         {messages.map((message) => (
           <motion.div key={message.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex items-start gap-3 ${message.sender === "user" ? "flex-row-reverse" : ""}`}>
             <Avatar sender={message.sender} />
-            <div className={`max-w-[82%] rounded-lg px-4 py-3 text-sm leading-relaxed ${message.sender === "user" ? "bg-sky-500 text-slate-950" : "border border-[color:var(--md-border)] bg-[color:var(--md-hover)] text-[color:var(--md-text-secondary)]"}`}>
+            <div className={`ai-chat-message-bubble max-w-[82%] rounded-lg px-4 py-3 text-sm leading-relaxed ${message.sender === "user" ? "ai-chat-message-user" : "ai-chat-message-bot"}`}>
               {message.text ? renderMarkdown(message.text) : <TypingDots />}
             </div>
           </motion.div>
@@ -581,7 +604,7 @@ function ChatSurface({ compact = false, activeDocument = null, allowStudentDocum
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="border-t border-[color:var(--md-border)] bg-[color:var(--md-hover)] p-3">
+      <div className="ai-chat-composer border-t border-[color:var(--md-border)] p-3">
         <div className="flex gap-2">
           {allowStudentDocumentUpload && (
             <>
@@ -590,7 +613,7 @@ function ChatSurface({ compact = false, activeDocument = null, allowStudentDocum
                 onClick={() => privateFileInputRef.current?.click()}
                 disabled={documentUploading || isTyping}
                 title={activeDocument?.visibility === "private" ? "Replace private document" : "Upload private document"}
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] text-[color:var(--md-text-secondary)] transition hover:border-sky-400/50 hover:bg-sky-400/10 hover:text-[color:var(--md-text-primary)] disabled:cursor-not-allowed disabled:opacity-40"
+                className="ai-chat-icon-button flex h-12 w-12 shrink-0 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Upload size={18} />
               </button>
@@ -609,9 +632,9 @@ function ChatSurface({ compact = false, activeDocument = null, allowStudentDocum
             }}
             rows={1}
             placeholder={activeDocument ? "Ask ATI Buddy Pro anything about this selected document..." : isStaff ? "Ask about assignments, low attendance, policies, reports, rubrics, analytics, or documents..." : "Message ATI Buddy Pro about study plans, GPA, attendance, timetable, code, or careers..."}
-            className="min-h-12 min-w-0 flex-1 resize-none rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] px-4 py-3 text-sm text-[color:var(--md-text-primary)] outline-none placeholder:text-[color:var(--md-text-secondary)] focus:border-sky-400/60"
+            className="ai-chat-input min-h-12 min-w-0 flex-1 resize-none rounded-lg px-4 py-3 text-sm outline-none"
           />
-          <button type="button" onClick={() => submit()} disabled={!input.trim() || isTyping} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-sky-500 text-slate-950 transition hover:bg-sky-400 disabled:bg-[color:var(--md-hover)] disabled:text-[color:var(--md-text-secondary)]">
+          <button type="button" onClick={() => submit()} disabled={!input.trim() || isTyping} className="ai-chat-send-button flex h-12 w-12 shrink-0 items-center justify-center rounded-lg transition">
             <Send size={18} />
           </button>
           {allowStudentDocumentUpload && activeDocument?.visibility === "private" && (
@@ -643,7 +666,7 @@ function AIAssistantPage() {
   const role = String(user?.role || "").toLowerCase();
   const userKey = String(user?.id || user?._id || user?.email || "guest");
   const isStudent = role === "student";
-  const isStaff = ["lecturer", "department_staff"].includes(role);
+  const isStaff = ["lecturer", "department_staff", "admin"].includes(role);
   const canManage = ["lecturer", "department_staff", "admin"].includes(role);
   const canUpload = ["lecturer", "department_staff", "admin"].includes(role);
   const knowledgeFileInputRef = useRef(null);
@@ -788,11 +811,11 @@ function AIAssistantPage() {
     <section className="space-y-6">
       <div className={isStaff ? "ai-staff-hero" : "flex flex-col gap-4 border-b border-[color:var(--md-border)] pb-5 lg:flex-row lg:items-end lg:justify-between"}>
         <div>
-          <p className={isStaff ? "ai-staff-eyebrow" : "text-xs font-bold uppercase tracking-[0.18em] text-sky-300"}>{isStaff ? "Faculty Portal AI" : "RAG System"}</p>
-          <h1 className={isStaff ? "ai-staff-title" : "mt-2 text-2xl font-black text-[color:var(--md-text-primary)] sm:text-3xl"}>{isStaff ? "ATI Buddy Pro - Staff Assistant" : "AI Assistant"}</h1>
+          <p className={isStaff ? "ai-staff-eyebrow" : "text-xs font-bold uppercase tracking-[0.18em] text-sky-300"}>{role === "admin" ? "Admin Portal RAG System" : isStaff ? "Faculty Portal AI" : "RAG System"}</p>
+          <h1 className={isStaff ? "ai-staff-title" : "mt-2 text-2xl font-black text-[color:var(--md-text-primary)] sm:text-3xl"}>{role === "admin" ? "ATI Buddy Pro - Admin RAG Assistant" : isStaff ? "ATI Buddy Pro - Staff Assistant" : "AI Assistant"}</h1>
           <p className={isStaff ? "ai-staff-subtitle" : "mt-1 text-sm text-[color:var(--md-text-secondary)]"}>
             {isStaff
-              ? "Ask staff questions across assignments, attendance, student performance, university policy documents, uploaded files, reports, and communication drafts."
+              ? "Ask across assignments, attendance, student performance, university policy documents, uploaded files, reports, and communication drafts."
               : "Chat with department knowledge, uploaded course documents, and live portal context using RAG."}
           </p>
         </div>
@@ -809,7 +832,7 @@ function AIAssistantPage() {
         <GlassCard dark className="ai-staff-capabilities">
           <div className="ai-staff-section-head">
             <div>
-              <h2>Staff can ask ATI Buddy Pro</h2>
+              <h2>{role === "admin" ? "Admin can ask ATI Buddy Pro" : "Staff can ask ATI Buddy Pro"}</h2>
               <p>Use natural language for policy answers, teaching support, analytics, document intelligence, search, and communication drafts.</p>
             </div>
             <span>Click any card to ask</span>
@@ -836,8 +859,8 @@ function AIAssistantPage() {
           <GlassCard key={label} dark className={isStaff ? "ai-staff-stat-card" : "p-5"}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-[color:var(--md-text-secondary)]">{label}</p>
-                <p className="mt-2 text-3xl font-black text-[color:var(--md-text-primary)]">{value}</p>
+                <p className="ai-staff-stat-label text-xs font-bold uppercase tracking-[0.14em]">{label}</p>
+                <p className="ai-staff-stat-value mt-2 text-3xl font-black">{value}</p>
               </div>
               <Icon className="text-sky-300" size={24} />
             </div>
@@ -859,22 +882,22 @@ function AIAssistantPage() {
         <div className="space-y-6">
           {canUpload && (
             <GlassCard dark className={isStaff ? "ai-staff-side-card" : "p-5"}>
-              <h2 className="text-lg font-black text-[color:var(--md-text-primary)]">{isStaff ? "Knowledge Upload" : "Upload Knowledge"}</h2>
-              <p className="mt-1 text-sm text-[color:var(--md-text-secondary)]">
+              <h2 className="ai-panel-title text-lg font-black">{isStaff ? "Knowledge Upload" : "Upload Knowledge"}</h2>
+              <p className="ai-readable-copy mt-1 text-sm">
                 Upload PDF, DOCX, PPTX, or TXT files. AI extracts text, chunks it, stores embeddings, and retrieves relevant context during chat.
               </p>
               <div className="mt-4 space-y-3">
-                <input value={uploadForm.title} onChange={(event) => setUploadForm((current) => ({ ...current, title: event.target.value }))} placeholder="Title" className="w-full rounded-lg border border-[color:var(--md-border)] bg-slate-950 px-3 py-2.5 text-sm text-[color:var(--md-text-primary)] outline-none focus:border-sky-400" />
-                <input value={uploadForm.topicModule} onChange={(event) => setUploadForm((current) => ({ ...current, topicModule: event.target.value }))} placeholder="Topic / module / week" className="w-full rounded-lg border border-[color:var(--md-border)] bg-slate-950 px-3 py-2.5 text-sm text-[color:var(--md-text-primary)] outline-none focus:border-sky-400" />
+                <input value={uploadForm.title} onChange={(event) => setUploadForm((current) => ({ ...current, title: event.target.value }))} placeholder="Title" className="ai-panel-input w-full rounded-lg px-3 py-2.5 text-sm outline-none" />
+                <input value={uploadForm.topicModule} onChange={(event) => setUploadForm((current) => ({ ...current, topicModule: event.target.value }))} placeholder="Topic / module / week" className="ai-panel-input w-full rounded-lg px-3 py-2.5 text-sm outline-none" />
                 {role === "admin" && (
-                  <input value={uploadForm.department} onChange={(event) => setUploadForm((current) => ({ ...current, department: event.target.value }))} placeholder="Department (blank = All Departments)" className="w-full rounded-lg border border-[color:var(--md-border)] bg-slate-950 px-3 py-2.5 text-sm text-[color:var(--md-text-primary)] outline-none focus:border-sky-400" />
+                  <input value={uploadForm.department} onChange={(event) => setUploadForm((current) => ({ ...current, department: event.target.value }))} placeholder="Department (blank = All Departments)" className="ai-panel-input w-full rounded-lg px-3 py-2.5 text-sm outline-none" />
                 )}
                 <button type="button" onClick={openUploadPicker} disabled={uploading} className={isStaff ? "ai-staff-upload-dropzone" : "flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-[color:var(--md-border)] bg-slate-950 px-4 py-8 text-sm font-bold text-[color:var(--md-text-secondary)] hover:border-sky-400 hover:text-[color:var(--md-text-primary)] disabled:cursor-not-allowed disabled:opacity-60"}>
                   <Upload size={18} />
                   {uploading ? "Indexing..." : "Upload document"}
                 </button>
                 <input ref={knowledgeFileInputRef} type="file" accept=".pdf,.docx,.pptx,.txt" disabled={uploading} onChange={(event) => { uploadDocument(event.target.files?.[0]); event.target.value = ""; }} className="hidden" />
-                <button type="button" onClick={clearActiveDocument} className="w-full rounded-lg border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm font-black text-red-200 hover:bg-red-500/20">
+                <button type="button" onClick={clearActiveDocument} className="ai-clear-context-button w-full rounded-lg px-4 py-3 text-sm font-black">
                   Clear Selected Document Context
                 </button>
               </div>
@@ -882,7 +905,7 @@ function AIAssistantPage() {
           )}
 
           <GlassCard dark className={isStaff ? "ai-staff-side-card" : "p-5"}>
-            <h2 className="text-lg font-black text-[color:var(--md-text-primary)]">{isStaff ? "Policy & Knowledge Files" : "Knowledge Files"}</h2>
+            <h2 className="ai-panel-title text-lg font-black">{isStaff ? "Policy & Knowledge Files" : "Knowledge Files"}</h2>
             <div className="mt-4 max-h-[520px] space-y-3 overflow-y-auto">
               {!documents.length && (
                 <div className={isStaff ? "ai-staff-empty-state" : "py-8 text-center text-sm text-[color:var(--md-text-secondary)]"}>
@@ -892,35 +915,35 @@ function AIAssistantPage() {
                 </div>
               )}
               {documents.map((document) => (
-                <div key={document._id} className={`rounded-lg border p-3 ${activeDocument?._id === document._id ? "border-sky-400 bg-sky-500/10" : "border-[color:var(--md-border)] bg-[color:var(--md-hover)]"}`}>
+                <div key={document._id} className={`ai-knowledge-document-card rounded-lg border p-3 ${activeDocument?._id === document._id ? "ai-knowledge-document-card-active" : ""}`}>
                   {editingId === document._id ? (
                     <div className="space-y-3">
-                      <input value={editForm.title} onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))} className="w-full rounded-lg border border-[color:var(--md-border)] bg-slate-950 px-3 py-2 text-sm text-[color:var(--md-text-primary)] outline-none focus:border-sky-400" />
-                      <input value={editForm.topicModule} onChange={(event) => setEditForm((current) => ({ ...current, topicModule: event.target.value }))} placeholder="Topic / module / week" className="w-full rounded-lg border border-[color:var(--md-border)] bg-slate-950 px-3 py-2 text-sm text-[color:var(--md-text-primary)] outline-none focus:border-sky-400" />
+                      <input value={editForm.title} onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))} className="ai-panel-input w-full rounded-lg px-3 py-2 text-sm outline-none" />
+                      <input value={editForm.topicModule} onChange={(event) => setEditForm((current) => ({ ...current, topicModule: event.target.value }))} placeholder="Topic / module / week" className="ai-panel-input w-full rounded-lg px-3 py-2 text-sm outline-none" />
                       <div className="flex gap-2">
                         <button type="button" onClick={() => saveDocument(document)} className="rounded-lg bg-sky-500 px-3 py-2 text-xs font-black text-slate-950 hover:bg-sky-400">Save</button>
-                        <button type="button" onClick={cancelEditDocument} className="rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] px-3 py-2 text-xs font-bold text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)]">Cancel</button>
+                        <button type="button" onClick={cancelEditDocument} className="ai-chat-secondary-button rounded-lg px-3 py-2 text-xs font-bold">Cancel</button>
                       </div>
                     </div>
                   ) : (
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <h3 className="truncate text-sm font-black text-[color:var(--md-text-primary)]">{document.title}</h3>
-                        <p className="mt-1 text-xs text-[color:var(--md-text-secondary)]">{document.fileType.toUpperCase()} | {document.chunkCount} chunks | {document.topicModule || "General"}</p>
+                        <h3 className="ai-panel-title truncate text-sm font-black">{document.title}</h3>
+                        <p className="ai-readable-copy mt-1 text-xs">{document.fileType.toUpperCase()} | {document.chunkCount} chunks | {document.topicModule || "General"}</p>
                         <span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold uppercase ${document.status === "indexed" ? "bg-emerald-500/15 text-emerald-300" : document.status === "failed" ? "bg-red-500/15 text-red-300" : "bg-amber-500/15 text-amber-300"}`}>
                           {document.status}
                         </span>
-                        <button type="button" onClick={() => setActiveDocument(document)} className="mt-2 block rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] px-3 py-1.5 text-xs font-bold text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)]">
+                        <button type="button" onClick={() => setActiveDocument(document)} className="ai-chat-secondary-button mt-2 block rounded-lg px-3 py-1.5 text-xs font-bold">
                           Use only this document
                         </button>
                       </div>
                       <div className="flex gap-2">
-                        <a href={document.fileUrl} target="_blank" rel="noreferrer" title="Open file" className="rounded-lg bg-[color:var(--md-hover)] p-2 text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)] hover:text-[color:var(--md-text-primary)]">
+                        <a href={document.fileUrl} target="_blank" rel="noreferrer" title="Open file" className="ai-chat-icon-button rounded-lg p-2">
                           <LinkIcon size={15} />
                         </a>
                       {(canManage || String(document.uploadedBy || "") === String(user?.id || user?._id || "")) && (
                           <>
-                            <button type="button" onClick={() => startEditDocument(document)} title="Edit knowledge file" className="rounded-lg bg-[color:var(--md-hover)] p-2 text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)] hover:text-[color:var(--md-text-primary)]">
+                            <button type="button" onClick={() => startEditDocument(document)} title="Edit knowledge file" className="ai-chat-icon-button rounded-lg p-2">
                               <FileText size={15} />
                             </button>
                             <button type="button" onClick={() => deleteDocument(document)} title="Delete knowledge file" className="rounded-lg bg-red-500/10 p-2 text-red-300 hover:bg-red-500/20">
@@ -946,7 +969,7 @@ function AIAssistantPage() {
           [Database, "Retrieve context"],
           [MessageSquare, "Stream answer"]
         ].filter(Boolean).map(([Icon, label, onClick]) => (
-          <button key={label} type="button" onClick={onClick || undefined} className={`rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] p-4 text-left text-sm font-bold text-[color:var(--md-text-secondary)] ${onClick ? "transition hover:border-sky-400/50 hover:bg-sky-400/10 hover:text-[color:var(--md-text-primary)]" : ""}`}>
+          <button key={label} type="button" onClick={onClick || undefined} className={`ai-rag-step-card rounded-lg p-4 text-left text-sm font-bold ${onClick ? "transition hover:border-sky-400/50 hover:bg-sky-400/10 hover:text-[color:var(--md-text-primary)]" : ""}`}>
             <Icon className="mb-3 text-sky-300" size={20} />
             {label}
           </button>
@@ -1054,7 +1077,7 @@ function FloatingAssistant() {
     <div className="fixed bottom-5 right-5 z-[9999] sm:bottom-6 sm:right-6">
       <AnimatePresence>
         {isOpen && (
-          <motion.div initial={{ opacity: 0, y: 60, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 30, scale: 0.96 }} transition={{ type: "spring", damping: 24, stiffness: 300 }} className="public-chat-window">
+          <motion.div initial={{ opacity: 0, y: 60, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 30, scale: 0.96 }} transition={{ type: "spring", damping: 24, stiffness: 300 }} className={`public-chat-window ${isAuthenticated ? "public-chat-window-pro" : ""}`}>
             <div className="public-chat-header">
               <div className="public-chat-header-main">
                 <div className="public-chat-header-icon">
@@ -1063,7 +1086,7 @@ function FloatingAssistant() {
                 <div>
                   <div className="public-chat-heading">
                     <h2>{isAuthenticated ? "ATI Buddy Pro" : "ATI Buddy"}</h2>
-                    <span className={isAuthenticated ? "public-chat-heading-pro" : ""}><i /> {isAuthenticated ? "Armed" : t("chat.online")}</span>
+                    <span className={isAuthenticated ? "public-chat-heading-pro" : ""}><i /> {isAuthenticated ? "Ready" : t("chat.online")}</span>
                   </div>
                   {!isAuthenticated && <p>{t("chat.subtitle")}</p>}
                 </div>

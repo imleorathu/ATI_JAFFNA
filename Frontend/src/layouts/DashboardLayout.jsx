@@ -35,6 +35,7 @@ import {
   UserCog,
   Settings,
   FilePenLine,
+  HeartHandshake,
   Moon,
   Sun
 } from "lucide-react";
@@ -76,6 +77,7 @@ const roleNavLinks = {
     { to: "courses", label: "Course Management", icon: BookOpen },
     { to: "grades", label: "Grade Management", icon: BarChart3 },
     { to: "fees", label: "Part-Time Fees", icon: Wallet },
+    { to: "donations", label: "Donations", icon: HeartHandshake },
     { to: "messages", label: "Admin Messages", icon: MessageSquare },
     { to: "ai-assistant", label: "AI Assistant", icon: Bot },
     { to: "cms", label: "Page Customization", icon: FilePenLine },

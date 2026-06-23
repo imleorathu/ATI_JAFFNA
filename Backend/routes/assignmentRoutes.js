@@ -1,6 +1,5 @@
 import { Router } from "express";
 import fs from "fs";
-import multer from "multer";
 import path from "path";
 import {
   addAssignmentComment,
@@ -13,20 +12,16 @@ import {
   uploadAssignmentFiles
 } from "../controllers/assignmentController.js";
 import { requireAuth } from "../middleware/auth.js";
+import { createDiskUpload } from "../middleware/upload.js";
 
 const router = Router();
 const uploadDir = path.resolve("uploads/assignments");
 fs.mkdirSync(uploadDir, { recursive: true });
 
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, callback) => callback(null, uploadDir),
-    filename: (_req, file, callback) => {
-      const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "-");
-      callback(null, `${Date.now()}-${safeName}`);
-    }
-  }),
-  limits: { fileSize: 100 * 1024 * 1024 }
+const upload = createDiskUpload({
+  uploadDir,
+  groupName: "assignment",
+  maxFileSize: 25 * 1024 * 1024
 });
 
 router.get("/", requireAuth, listAssignments);

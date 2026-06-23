@@ -1,5 +1,5 @@
 import { motion, useReducedMotion, useScroll, useSpring, useTransform } from "framer-motion";
-import { ArrowRight, Bell, BookOpen, CalendarDays, GraduationCap, Newspaper, Users } from "lucide-react";
+import { ArrowRight, Bell, BookOpen, CalendarDays, Gift, GraduationCap, Heart, Newspaper, ShieldCheck, Users } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import GlassCard from "../components/GlassCard.jsx";
@@ -82,10 +82,11 @@ function CampusParallaxSection({ children }) {
   return (
     <section ref={ref} className="relative isolate overflow-hidden py-24">
       <motion.div
-        className="absolute -inset-x-8 -inset-y-28 bg-gradient-to-br from-[#1e293b] via-[#0f172a] to-[#0d6efd]/30 bg-cover bg-center will-change-transform"
+        className="campus-life-bg absolute -inset-x-8 -inset-y-28 will-change-transform"
         style={{ y: smoothBackgroundY, scale: 1.08 }}
       />
-      <div className="absolute inset-0 bg-gradient-to-r from-[#0f172a]/88 via-[#0f172a]/64 to-[#0d6efd]/42" />
+      <div className="campus-life-overlay absolute inset-0" />
+      <div className="campus-life-glow absolute inset-0" />
       <motion.div style={{ y: smoothContentY }} className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {children}
       </motion.div>
@@ -312,9 +313,9 @@ export default function Home() {
           <div
             className="max-w-2xl text-white"
           >
-            <p className="text-sm font-bold uppercase tracking-[0.24em] text-blue-200">{t("home.campusLife")}</p>
-            <h2 className="mt-3 text-3xl font-black md:text-5xl">{t("home.campusTitle")}</h2>
-            <p className="mt-5 text-base leading-7 text-slate-100">{t("home.campusText")}</p>
+            <p className="text-sm font-bold uppercase tracking-[0.24em] text-[color:var(--campus-life-eyebrow)]">{t("home.campusLife")}</p>
+            <h2 className="mt-3 text-3xl font-black text-white drop-shadow-sm md:text-5xl">{t("home.campusTitle")}</h2>
+            <p className="mt-5 text-base leading-7 text-[color:var(--campus-life-copy)]">{t("home.campusText")}</p>
           </div>
       </CampusParallaxSection>
 
@@ -413,6 +414,61 @@ export default function Home() {
               </div>
             )}
           </div>
+        </div>
+      </ParallaxSection>
+
+      <ParallaxSection className="page-section pt-0" speed={18}>
+        <div className="mx-auto max-w-7xl">
+          <section className="relative isolate overflow-hidden rounded-2xl border border-[color:var(--md-border)] bg-[color:var(--md-card)] p-6 shadow-[var(--md-shadow)] sm:p-8 lg:p-10">
+            <div className="absolute inset-y-0 right-0 -z-10 w-1/2 bg-gradient-to-l from-blue-500/10 via-sky-400/8 to-transparent" />
+            <div className="absolute -right-20 -top-20 -z-10 h-56 w-56 rounded-full bg-[color:var(--md-primary)]/10 blur-3xl" />
+            <div className="grid items-center gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+              <div>
+                <p className="inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-[color:var(--md-primary)]">
+                  <Heart size={15} />
+                  Donation
+                </p>
+                <h2 className="mt-5 max-w-2xl text-3xl font-black leading-tight text-[color:var(--md-text-primary)] md:text-4xl">
+                  Support the next generation of ATI Jaffna learners
+                </h2>
+                <p className="mt-4 max-w-2xl text-sm leading-7 text-[color:var(--md-text-secondary)] md:text-base">
+                  Your contribution can help improve student resources, campus activities, learning spaces, and scholarship support for deserving students.
+                </p>
+                <div className="mt-7 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/donate")}
+                    className="inline-flex items-center gap-2 rounded-lg bg-[color:var(--md-primary)] px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5"
+                  >
+                    Donate here
+                    <ArrowRight size={16} />
+                  </button>
+                  <a
+                    href="mailto:info@atijaffna.edu.lk?subject=Donation%20Inquiry%20for%20ATI%20Jaffna"
+                    className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] px-4 py-3 text-sm font-black text-[color:var(--md-text-primary)] transition hover:-translate-y-0.5"
+                  >
+                    Email Inquiry
+                  </a>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                {[
+                  ["Student Support", "Help students access better academic resources.", Gift],
+                  ["Campus Growth", "Contribute to practical learning and campus activities.", GraduationCap],
+                  ["Transparent Contact", "Reach ATI Jaffna directly before making any donation.", ShieldCheck]
+                ].map(([title, text, Icon]) => (
+                  <article key={title} className="rounded-xl border border-[color:var(--md-border)] bg-[color:var(--md-hover)] p-4">
+                    <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 text-[color:var(--md-primary)]">
+                      <Icon size={19} />
+                    </div>
+                    <h3 className="text-sm font-black text-[color:var(--md-text-primary)]">{title}</h3>
+                    <p className="mt-1.5 text-xs leading-5 text-[color:var(--md-text-secondary)]">{text}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
         </div>
       </ParallaxSection>
     </>
