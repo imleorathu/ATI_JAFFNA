@@ -53,6 +53,25 @@ export function requireFeeManagementAccess(req, res, next) {
   return res.status(403).json({ message: "Fee management access required." });
 }
 
+export async function requirePartTimeStudentFeeAccess(req, res, next) {
+  try {
+    if (!isStudent(req.user)) return next();
+
+    const scope = await resolveFeeScope(req);
+    if (scope.error) {
+      return res.status(403).json({ message: scope.error });
+    }
+    if (scope.student?.studyMode !== "Part-time") {
+      return res.status(403).json({ message: "Student fees are available only to part-time students." });
+    }
+
+    req.feeScope = scope;
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+}
+
 export async function getLoggedInUser(req) {
   if (!req.user?.id) return null;
   return User.findById(req.user.id).lean();

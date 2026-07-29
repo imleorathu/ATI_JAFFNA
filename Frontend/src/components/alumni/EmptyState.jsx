@@ -1,0 +1,2 @@
+import { Inbox } from "lucide-react";
+export default function EmptyState({ title="Nothing here yet", message="New items will appear here." }) { return <div className="py-12 text-center"><Inbox className="mx-auto text-[color:var(--md-text-secondary)]"/><p className="mt-3 font-black text-[color:var(--md-text-primary)]">{title}</p><p className="mt-1 text-sm text-[color:var(--md-text-secondary)]">{message}</p></div>; }

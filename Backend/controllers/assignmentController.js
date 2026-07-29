@@ -46,6 +46,7 @@ function assignmentResponse(record, viewerStudent = null) {
     totalMarks: record.totalMarks,
     status: record.status,
     publishAt: record.publishAt,
+    dueDate: record.dueDate,
     notifyByEmail: record.notifyByEmail,
     attachmentUrl: record.attachmentUrl,
     attachments: record.attachments || [],
@@ -184,6 +185,7 @@ async function assignmentPayload(req, existingRecord = null) {
       totalMarks: Number(req.body.totalMarks ?? existingRecord?.totalMarks ?? 100),
       status: req.body.status || existingRecord?.status || "published",
       publishAt: Object.prototype.hasOwnProperty.call(req.body, "publishAt") ? req.body.publishAt || undefined : existingRecord?.publishAt || undefined,
+      dueDate: Object.prototype.hasOwnProperty.call(req.body, "dueDate") ? req.body.dueDate || undefined : existingRecord?.dueDate || undefined,
       notifyByEmail: Boolean(req.body.notifyByEmail ?? existingRecord?.notifyByEmail ?? false),
       attachmentUrl: String(req.body.attachmentUrl ?? existingRecord?.attachmentUrl ?? "").trim(),
       attachments: normalizeAttachments(req.body.attachments ?? existingRecord?.attachments ?? []),
@@ -224,7 +226,10 @@ export async function listAssignments(req, res, next) {
     }
 
     const records = await Assignment.find(query).sort({ createdAt: -1, subject: 1, title: 1 });
-    res.json(records.map((record) => assignmentResponse(record, viewerStudent)));
+    const visibleRecords = viewerStudent
+      ? records.filter((record) => studentCanSeeAssignment(record, viewerStudent))
+      : records;
+    res.json(visibleRecords.map((record) => assignmentResponse(record, viewerStudent)));
   } catch (error) {
     next(error);
   }

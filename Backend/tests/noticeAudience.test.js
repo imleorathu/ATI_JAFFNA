@@ -24,6 +24,6 @@ test("faculty aliases see all-visitors and lecturer notices", () => {
   assert.deepEqual(allowedAudiencesFor({ role: "department_staff" }), ["all", "lecturers"]);
 });
 
-test("admins can see every notice audience", () => {
-  assert.deepEqual(visibleNoticeAudienceFilter({ role: "admin" }), {});
+test("admins see all-visitors and admin notices only", () => {
+  assert.deepEqual(allowedAudiencesFor({ role: "admin" }), ["all", "admins"]);
 });

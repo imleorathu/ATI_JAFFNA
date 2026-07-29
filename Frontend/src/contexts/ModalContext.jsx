@@ -22,6 +22,13 @@ export function ModalProvider({ children }) {
       return null;
     });
   }, []);
+  const cancelPrompt = useCallback(() => {
+    setInputValue("");
+    setPrompt((current) => {
+      current?.resolve?.(current.textInput ? null : false);
+      return null;
+    });
+  }, []);
 
   const confirm = useCallback((options) => {
     const settings = typeof options === "string" ? { message: options } : options;
@@ -76,7 +83,7 @@ export function ModalProvider({ children }) {
   return (
     <ModalContext.Provider value={value}>
       {children}
-      <AppModal open={Boolean(prompt)} onClose={() => closePrompt(false)} size="sm">
+      <AppModal open={Boolean(prompt)} onClose={cancelPrompt} size="sm">
         {prompt && (
           <div className="app-prompt">
             <div className={`app-prompt-icon app-prompt-icon-${prompt.tone}`}>
@@ -95,14 +102,14 @@ export function ModalProvider({ children }) {
             )}
             <div className="app-prompt-actions">
               {!prompt.alertOnly && (
-                <button type="button" className="app-modal-button app-modal-button-muted" onClick={() => closePrompt(false)}>
+                <button type="button" className="app-modal-button app-modal-button-muted" onClick={cancelPrompt}>
                   {prompt.cancelLabel}
                 </button>
               )}
               <button
                 type="button"
                 className={`app-modal-button ${prompt.tone === "danger" ? "app-modal-button-danger" : "app-modal-button-primary"}`}
-                onClick={() => closePrompt(prompt.textInput ? inputValue.trim() || null : true)}
+                onClick={() => closePrompt(prompt.textInput ? (inputValue.trim() || (prompt.allowEmpty ? "" : null)) : true)}
               >
                 {prompt.confirmLabel}
               </button>

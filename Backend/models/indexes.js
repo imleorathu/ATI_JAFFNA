@@ -16,7 +16,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 async function ensureIndexes() {
-  const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/ATI_JAFFNA";
+  const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/ATI_Jaffna";
   
   try {
     await mongoose.connect(mongoUri);
@@ -37,8 +37,12 @@ async function ensureIndexes() {
     await userCollection.createIndex({ role: 1 });
     
     // Support student profile queries
-    await userCollection.createIndex({ "studentProfile.studentId": 1 }, { 
-      partialFilterExpression: { "studentProfile.studentId": { $exists: true } } 
+    await userCollection.createIndex({ "studentProfile.studentId": 1 }, {
+      unique: true,
+      partialFilterExpression: {
+        role: "student",
+        "studentProfile.studentId": { $exists: true, $type: "string" }
+      }
     });
     
     // Support department-based queries

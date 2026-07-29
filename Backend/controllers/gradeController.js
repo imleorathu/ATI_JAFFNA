@@ -3,6 +3,8 @@ import Student from "../models/Student.js";
 import User from "../models/User.js";
 import { getDepartmentScope } from "../middleware/departmentAccess.js";
 
+const gradeOptions = ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "F"];
+
 function gradeFromScore(score) {
   const value = Number(score);
   if (value >= 90) return "A+";
@@ -116,6 +118,85 @@ export async function createGrade(req, res, next) {
     res.status(201).json(gradeResponse(record));
   } catch (error) {
     if (error?.code === 11000) return res.status(409).json({ message: "A grade already exists for this student, subject, and semester." });
+    next(error);
+  }
+}
+
+export async function bulkImportGrades(req, res, next) {
+  try {
+    if (!Array.isArray(req.body?.grades) || !req.body.grades.length) {
+      return res.status(400).json({ message: "Add at least one grade row to import." });
+    }
+    if (!departmentStaffRoles.includes(req.user?.role) && req.user?.role !== "admin") {
+      return res.status(403).json({ message: "Admin or faculty access required." });
+    }
+    if (req.body.grades.length > 1000) {
+      return res.status(400).json({ message: "A maximum of 1,000 grade rows can be imported at once." });
+    }
+
+    const scope = departmentStaffRoles.includes(req.user?.role) ? await facultyScope(req) : null;
+    if (scope?.error) return res.status(403).json({ message: scope.error });
+
+    const results = { created: 0, updated: 0, errors: [] };
+    const seen = new Set();
+
+    for (let index = 0; index < req.body.grades.length; index += 1) {
+      const row = req.body.grades[index] || {};
+      const rowNumber = index + 2;
+      const studentId = String(row.studentId || "").trim();
+      const email = String(row.email || "").trim().toLowerCase();
+      const subject = String(row.subject || "").trim();
+      const semester = Number(row.semester);
+      const credits = Number(row.credits);
+      const score = Number(row.score);
+
+      if ((!studentId && !email) || !subject || !Number.isInteger(semester) || semester < 1 || !Number.isFinite(credits) || credits < 0 || !Number.isFinite(score) || score < 0 || score > 100) {
+        results.errors.push({ row: rowNumber, message: "Use studentId or email, subject, semester (1+), credits (0+), and score (0-100)." });
+        continue;
+      }
+
+      const student = await Student.findOne({ $or: [...(studentId ? [{ studentId }] : []), ...(email ? [{ email }] : [])] });
+      if (!student) {
+        results.errors.push({ row: rowNumber, message: "Student was not found." });
+        continue;
+      }
+      if (scope && student.department !== scope.department) {
+        results.errors.push({ row: rowNumber, message: "Student is outside your department." });
+        continue;
+      }
+
+      const key = `${student._id}:${subject.toLowerCase()}:${semester}`;
+      if (seen.has(key)) {
+        results.errors.push({ row: rowNumber, message: "This file contains a duplicate student, subject, and semester." });
+        continue;
+      }
+      seen.add(key);
+
+      const payload = {
+        student: student._id,
+        studentName: student.fullName,
+        studentId: student.studentId,
+        department: student.department,
+        academicStage: student.academicStage,
+        subject,
+        semester,
+        credits,
+        score,
+        grade: gradeOptions.includes(String(row.grade || "").trim()) ? String(row.grade).trim() : gradeFromScore(score),
+        remarks: String(row.remarks || "").trim()
+      };
+      const existing = await GradeRecord.exists({ student: student._id, subject, semester });
+      await GradeRecord.findOneAndUpdate(
+        { student: student._id, subject, semester },
+        { $set: payload },
+        { upsert: true, new: true, runValidators: true }
+      );
+      if (existing) results.updated += 1;
+      else results.created += 1;
+    }
+
+    res.status(200).json({ message: `Imported ${results.created + results.updated} grade record(s).`, ...results });
+  } catch (error) {
     next(error);
   }
 }

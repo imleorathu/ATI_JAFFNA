@@ -19,8 +19,9 @@ function today() {
 }
 
 function uniqueSubjects(records, timetable) {
+  const nonTeachingPeriods = new Set(["Lunch Break", "Free Period", "Interval"]);
   return Array.from(new Set([
-    ...timetable.map((e) => e.subject).filter((s) => s && s !== "Lunch Break"),
+    ...timetable.map((e) => e.subject).filter((subject) => subject && !nonTeachingPeriods.has(subject)),
     ...records.map((r) => r.subject).filter(Boolean)
   ])).sort();
 }

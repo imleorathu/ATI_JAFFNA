@@ -1,22 +1,33 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+export const API_BASE =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
+export function alumniPhotoUrl(value = "") {
+  if (!value) return "";
+  if (/^(https?:|blob:|data:)/i.test(value)) return value;
+  return `${API_BASE}/api/alumni/media/${encodeURIComponent(value)}`;
+}
 
 export async function apiFetch(path, options = {}) {
   const token = localStorage.getItem("atiToken");
   const isFormData = options.body instanceof FormData;
   const headers = {
-    ...(options.body && !isFormData ? { "Content-Type": "application/json" } : {}),
+    ...(options.body && !isFormData
+      ? { "Content-Type": "application/json" }
+      : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...options.headers
+    ...options.headers,
   };
 
   let response;
   try {
     response = await fetch(`${API_BASE}${path}`, {
       ...options,
-      headers
+      headers,
     });
   } catch (error) {
-    throw new Error(`Cannot reach the backend API at ${API_BASE}. Make sure the backend server is running.`);
+    throw new Error(
+      `Cannot reach the backend API at ${API_BASE}. Make sure the backend server is running.`,
+    );
   }
   const text = await response.text();
   const data = text
@@ -31,8 +42,13 @@ export async function apiFetch(path, options = {}) {
 
   if (!response.ok) {
     const plainText = text && !text.trim().startsWith("<") ? text : "";
-    const message = data?.message || plainText || `${response.status} ${response.statusText || "Request failed"}`.trim();
-    const isAuthError = response.status === 401 && /authentication required|invalid token|token expired/i.test(message);
+    const message =
+      data?.message ||
+      plainText ||
+      `${response.status} ${response.statusText || "Request failed"}`.trim();
+    const isAuthError =
+      response.status === 401 &&
+      /authentication required|invalid token|token expired/i.test(message);
 
     if (isAuthError) {
       localStorage.removeItem("atiUser");
@@ -47,12 +63,40 @@ export async function apiFetch(path, options = {}) {
   return data;
 }
 
+export async function downloadAuthenticatedFile(
+  path,
+  fallbackName = "download",
+) {
+  const token = localStorage.getItem("atiToken");
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.message || "Unable to download this file.");
+  }
+  const disposition = response.headers.get("content-disposition") || "";
+  const name =
+    disposition.match(/filename\*?=(?:UTF-8'')?\"?([^\";]+)/i)?.[1] ||
+    fallbackName;
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = decodeURIComponent(name);
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export function downloadCsv(filename, rows) {
   if (!rows.length) return;
 
   const headers = Object.keys(rows[0]);
-  const escapeCell = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
-  const csv = [headers.join(","), ...rows.map((row) => headers.map((key) => escapeCell(row[key])).join(","))].join("\n");
+  const escapeCell = (value) =>
+    `"${String(value ?? "").replaceAll('"', '""')}"`;
+  const csv = [
+    headers.join(","),
+    ...rows.map((row) => headers.map((key) => escapeCell(row[key])).join(",")),
+  ].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");

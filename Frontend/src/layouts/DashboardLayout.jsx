@@ -36,6 +36,7 @@ import {
   Settings,
   FilePenLine,
   HeartHandshake,
+  ShieldCheck,
   Moon,
   Sun
 } from "lucide-react";
@@ -66,6 +67,7 @@ const roleNavLinks = {
     { to: "attendance", label: "Attendance", icon: FileText },
     { to: "grades", label: "Grades", icon: BarChart3 },
     { to: "assignments", label: "Assignments", icon: FileText },
+    { to: "courses", label: "Courses", icon: BookOpen },
     { to: "ai-assistant", label: "AI Assistant", icon: Bot },
     { to: "messages", label: "Messages", icon: MessageSquare }
   ],
@@ -73,6 +75,9 @@ const roleNavLinks = {
     { to: "", label: "Dashboard", icon: LayoutDashboard, end: true },
     { to: "users", label: "User Approvals", icon: UserCog },
     { to: "students", label: "Student Management", icon: GraduationCap },
+    { to: "alumni", label: "Alumni Management", icon: HeartHandshake },
+    { to: "alumni-verification", label: "Alumni Verification", icon: ShieldCheck },
+    { to: "alumni-moderation", label: "Alumni Moderation", icon: Bell },
     { to: "faculty", label: "Faculty Management", icon: User },
     { to: "courses", label: "Course Management", icon: BookOpen },
     { to: "grades", label: "Grade Management", icon: BarChart3 },
@@ -90,10 +95,19 @@ const roleNavLinks = {
     { to: "messages", label: "Messages", icon: MessageSquare },
     { to: "settings", label: "Settings", icon: Settings }
   ],
+  Alumni: [
+    { to: "", label: "Dashboard", icon: LayoutDashboard, end: true },
+    { to: "feed", label: "News Feed", icon: FileText },
+    { to: "directory", label: "Alumni Directory", icon: User },
+    { to: "notifications", label: "Notifications", icon: Bell },
+    { to: "profile", label: "My Profile", icon: User },
+    { to: "privacy", label: "Privacy & Safety", icon: Settings }
+  ],
 };
 
 const roleLabels = {
   student: "Student",
+  alumni: "Alumni",
   admin: "Admin",
   lecturer: "Faculty",
   faculty: "Faculty",
@@ -106,6 +120,7 @@ const roleBasePaths = {
   Admin: "/admin",
   Faculty: "/faculty",
   Finance: "/finance",
+  Alumni: "/alumni",
 };
 
 function buildTheme(mode) {
@@ -166,10 +181,14 @@ export default function DashboardLayout({ user, children }) {
 
   const normalizedRole = String(user?.role || "student").toLowerCase();
   const role = roleLabels[normalizedRole] || "Student";
-  const navLinks = roleNavLinks[role] || roleNavLinks.Student;
+  const isPartTimeStudent = role === "Student" && user?.studentProfile?.studyMode === "Part-time";
+  const navLinks = (roleNavLinks[role] || roleNavLinks.Student).filter(
+    (link) => role !== "Student" || link.to !== "fees" || isPartTimeStudent
+  );
   const basePath = roleBasePaths[role] || "/student";
   const displayName = user?.name || user?.email || "User";
   const theme = useMemo(() => buildTheme(themeMode), [themeMode]);
+  const hideTopBar = normalizedRole === "alumni" && location.pathname === "/alumni/feed";
 
   useEffect(() => {
     setDrawerOpen(false);
@@ -183,7 +202,7 @@ export default function DashboardLayout({ user, children }) {
   const shell = (
     <Box className={`material-portal material-portal-${themeMode}`} sx={{ minHeight: "100vh", bgcolor: "background.default", color: "text.primary" }}>
       <CssBaseline />
-      <AppBar
+      {!hideTopBar && <AppBar
         position="fixed"
         elevation={0}
         sx={{
@@ -227,7 +246,7 @@ export default function DashboardLayout({ user, children }) {
             {displayName.charAt(0).toUpperCase()}
           </Avatar>
         </Toolbar>
-      </AppBar>
+      </AppBar>}
 
       <Box component="nav" aria-label="Portal navigation">
         <Drawer
@@ -260,7 +279,7 @@ export default function DashboardLayout({ user, children }) {
         </Drawer>
       </Box>
 
-      <Box component="main" sx={{ ml: { md: `${drawerWidth}px` }, pt: "64px", minHeight: "100vh" }}>
+      <Box component="main" sx={{ ml: { md: `${drawerWidth}px` }, pt: hideTopBar ? 0 : "64px", minHeight: "100vh" }}>
         <motion.div
           key={location.pathname}
           initial={{ opacity: 0, y: 10 }}

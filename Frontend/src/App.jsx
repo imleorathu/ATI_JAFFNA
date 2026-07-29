@@ -9,6 +9,21 @@ const Home = lazy(() => import("./pages/Home.jsx"));
 const About = lazy(() => import("./pages/About.jsx"));
 const Login = lazy(() => import("./pages/Login.jsx"));
 const Register = lazy(() => import("./pages/Register.jsx"));
+const AlumniRegister = lazy(() => import("./pages/AlumniRegister.jsx"));
+const AlumniDashboard = lazy(() => import("./pages/alumni/AlumniDashboard.jsx"));
+const AlumniProfilePage = lazy(() => import("./pages/alumni/AlumniProfilePage.jsx"));
+const AlumniFeedPage = lazy(() => import("./pages/alumni/AlumniFeedPage.jsx"));
+const AlumniDirectoryPage = lazy(() => import("./pages/alumni/AlumniDirectoryPage.jsx"));
+const AlumniPublicProfilePage = lazy(() => import("./pages/alumni/AlumniPublicProfilePage.jsx"));
+const AlumniConnectionsPage = lazy(() => import("./pages/alumni/AlumniConnectionsPage.jsx"));
+const AlumniNotificationsPage = lazy(() => import("./pages/alumni/AlumniNotificationsPage.jsx"));
+const AlumniSavedPage = lazy(() => import("./pages/alumni/AlumniSavedPage.jsx"));
+const AlumniVerificationPage = lazy(() => import("./pages/alumni/AlumniVerificationPage.jsx"));
+const AlumniPrivacyPage = lazy(() => import("./pages/alumni/AlumniPrivacyPage.jsx"));
+const AlumniChatPage = lazy(() => import("./pages/alumni/AlumniChatPage.jsx"));
+const AlumniManagement = lazy(() => import("./pages/dashboard/AlumniManagement.jsx"));
+const AlumniVerificationManagement = lazy(() => import("./pages/dashboard/AlumniVerificationManagement.jsx"));
+const AlumniModerationPage = lazy(() => import("./pages/dashboard/AlumniModerationPage.jsx"));
 const ChangePassword = lazy(() => import("./pages/ChangePassword.jsx"));
 const Faculties = lazy(() => import("./pages/Faculties.jsx"));
 const Courses = lazy(() => import("./pages/Courses.jsx"));
@@ -29,7 +44,8 @@ const AttendancePage = lazy(() => import("./pages/dashboard/AttendancePage.jsx")
 const GradesPage = lazy(() => import("./pages/dashboard/GradesPage.jsx"));
 const AssignmentsPage = lazy(() => import("./pages/dashboard/AssignmentsPage.jsx"));
 const FeesPage = lazy(() => import("./pages/dashboard/FeesPage.jsx"));
-const LMSDashboard = lazy(() => import("./pages/lms/LMSDashboard.jsx"));
+const LMSDashboard = lazy(() => import("./pages/lms/StudentCoursesPage.jsx"));
+const FacultyCoursesPage = lazy(() => import("./pages/faculty/FacultyCoursesPage.jsx"));
 const FacultyDashboard = lazy(() => import("./pages/faculty/FacultyDashboard.jsx"));
 const MessagesPage = lazy(() => import("./pages/communication/MessagesPage.jsx"));
 const AnalyticsPage = lazy(() => import("./pages/dashboard/AnalyticsPage.jsx"));
@@ -40,8 +56,10 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 function RouteFallback() {
   return (
-    <div className="classroom-card">
-      <p className="classroom-body text-[color:var(--md-text-secondary)]">Loading ATI Jaffna workspace...</p>
+    <div className="website-loader-screen" role="status" aria-live="polite">
+      <div className="website-loader-brand">ATI Jaffna</div>
+      <div className="loader" aria-label="Loading website"></div>
+      <p className="website-loader-copy">Preparing your workspace</p>
     </div>
   );
 }
@@ -52,7 +70,8 @@ const portalHomeByRole = {
   lecturer: "/faculty",
   faculty: "/faculty",
   department_staff: "/faculty",
-  student: "/student"
+  student: "/student",
+  alumni: "/alumni"
 };
 
 function hasRole(user, allowedRoles) {
@@ -61,6 +80,12 @@ function hasRole(user, allowedRoles) {
 
 function fallbackPortal(user) {
   return portalHomeByRole[String(user?.role || "").toLowerCase()] || "/login";
+}
+
+function PartTimeStudentFeesRoute({ user }) {
+  return user?.studentProfile?.studyMode === "Part-time"
+    ? <FeesPage />
+    : <Navigate to="/student" replace />;
 }
 
 function MaintenanceScreen({ status }) {
@@ -242,6 +267,10 @@ function MaintenanceGate({ children, allowDuringMaintenance = false }) {
   const isAdmin = String(user?.role || "").toLowerCase() === "admin";
   const isAuthPath = ["/login", "/change-password"].some((path) => location.pathname.startsWith(path));
 
+  if (status.loading) {
+    return <RouteFallback />;
+  }
+
   if (!allowDuringMaintenance && status.maintenanceMode && !isAdmin && !isAuthPath) {
     return <MaintenanceScreen status={status} />;
   }
@@ -251,7 +280,7 @@ function MaintenanceGate({ children, allowDuringMaintenance = false }) {
 
 function MainSite() {
   const location = useLocation();
-  const hideAi = ["/login", "/register", "/change-password", "/faculty"].some((path) => location.pathname.startsWith(path));
+  const hideAi = ["/login", "/register", "/alumni/register", "/change-password", "/faculty"].some((path) => location.pathname.startsWith(path));
 
   return (
     <MaintenanceGate>
@@ -281,6 +310,16 @@ function MainSite() {
   );
 }
 
+function PublicAlumniRegistration() {
+  return (
+    <MaintenanceGate>
+      <Suspense fallback={<RouteFallback />}>
+        <AlumniRegister />
+      </Suspense>
+    </MaintenanceGate>
+  );
+}
+
 function StudentRoutes() {
   const { user, isAuthenticated } = useAuth();
 
@@ -302,7 +341,7 @@ function StudentRoutes() {
             <Route path="assignments" element={<AssignmentsPage />} />
             <Route path="messages" element={<MessagesPage />} />
             <Route path="announcements" element={<MessagesPage />} />
-            <Route path="fees" element={<FeesPage />} />
+            <Route path="fees" element={<PartTimeStudentFeesRoute user={user} />} />
             <Route path="ai-assistant" element={<AIAssistant />} />
             <Route path="*" element={<Navigate to="/student" replace />} />
           </Routes>
@@ -330,6 +369,9 @@ function AdminRoutes() {
           <Route path="fees" element={<FeesPage />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="students" element={<StudentManagement />} />
+          <Route path="alumni" element={<AlumniManagement />} />
+          <Route path="alumni-verification" element={<AlumniVerificationManagement />} />
+          <Route path="alumni-moderation" element={<AlumniModerationPage />} />
           <Route path="faculty" element={<FacultyManagement />} />
           <Route path="courses" element={<CourseManagement />} />
           <Route path="cms" element={<CmsManagement />} />
@@ -370,6 +412,7 @@ function FacultyRoutes() {
             <Route path="grades" element={<GradesPage />} />
             <Route path="fees" element={<FeesPage />} />
             <Route path="assignments" element={<AssignmentsPage />} />
+            <Route path="courses" element={<FacultyCoursesPage />} />
             <Route path="ai-assistant" element={<AIAssistant />} />
             <Route path="messages" element={<MessagesPage />} />
             <Route path="*" element={<Navigate to="/faculty" replace />} />
@@ -406,6 +449,26 @@ function FinanceRoutes() {
   );
 }
 
+function AlumniRoutes() {
+  const { user, isAuthenticated } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!hasRole(user, ["alumni"])) return <Navigate to={fallbackPortal(user)} replace />;
+  return <MaintenanceGate><DashboardLayout user={user}><Suspense fallback={<RouteFallback />}><Routes>
+    <Route path="" element={<AlumniDashboard user={user} />} />
+    <Route path="feed" element={<AlumniFeedPage />} />
+    <Route path="directory" element={<AlumniDirectoryPage />} />
+    <Route path="directory/:id" element={<AlumniPublicProfilePage />} />
+    <Route path="connections" element={<AlumniConnectionsPage />} />
+    <Route path="notifications" element={<AlumniNotificationsPage />} />
+    <Route path="saved" element={<AlumniSavedPage />} />
+    <Route path="verification" element={<AlumniVerificationPage />} />
+    <Route path="profile" element={<AlumniProfilePage />} />
+    <Route path="privacy" element={<AlumniPrivacyPage />} />
+    <Route path="chat" element={<AlumniChatPage />} />
+    <Route path="*" element={<Navigate to="/alumni" replace />} />
+  </Routes></Suspense></DashboardLayout></MaintenanceGate>;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -413,6 +476,10 @@ export default function App() {
       <Route path="/admin/*" element={<AdminRoutes />} />
       <Route path="/faculty/*" element={<FacultyRoutes />} />
       <Route path="/finance/*" element={<FinanceRoutes />} />
+      <Route element={<MainLayout />}>
+        <Route path="/alumni/register" element={<PublicAlumniRegistration />} />
+      </Route>
+      <Route path="/alumni/*" element={<AlumniRoutes />} />
       <Route path="/*" element={<MainSite />} />
     </Routes>
   );

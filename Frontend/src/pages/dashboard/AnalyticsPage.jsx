@@ -10,7 +10,7 @@ const resources = [
   { key: "faculty", path: "/api/faculty" },
   { key: "courses", path: "/api/courses" },
   { key: "departments", path: "/api/departments" },
-  { key: "notices", path: "/api/notices" },
+  { key: "notices", path: "/api/notices?management=all" },
   { key: "events", path: "/api/events" },
   { key: "contacts", path: "/api/contacts" }
 ];

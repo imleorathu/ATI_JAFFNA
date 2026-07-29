@@ -13,8 +13,6 @@ function visibleNoticeAudienceFilter(user) {
   const role = String(user?.role || "").toLowerCase();
   const allowedAudiences = audienceByRole[role] || ["all"];
 
-  if (role === "admin") return {};
-
   return {
     $or: [
       { audience: { $in: allowedAudiences } },
@@ -27,7 +25,11 @@ function visibleNoticeAudienceFilter(user) {
 
 async function listVisibleNotices(req, res, next) {
   try {
-    const notices = await Notice.find(visibleNoticeAudienceFilter(req.user)).sort({ createdAt: -1 });
+    const managementView =
+      req.user?.role === "admin" && req.query.management === "all";
+    const notices = await Notice.find(
+      managementView ? {} : visibleNoticeAudienceFilter(req.user),
+    ).sort({ createdAt: -1 });
     res.json(notices);
   } catch (error) {
     next(error);

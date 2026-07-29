@@ -48,6 +48,19 @@ const adminProfileSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const alumniProfileSchema = new mongoose.Schema(
+  {
+    alumniId: { type: mongoose.Schema.Types.ObjectId, ref: "Alumni", required: true },
+    studentRegistrationNumber: { type: String, required: true, trim: true },
+    department: { type: String, trim: true },
+    programme: { type: String, trim: true },
+    graduationYear: { type: String, trim: true },
+    verificationStatus: { type: String, trim: true },
+    profilePhotoUrl: { type: String, trim: true }
+  },
+  { _id: false }
+);
+
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -56,7 +69,7 @@ const userSchema = new mongoose.Schema(
     mustChangePassword: { type: Boolean, default: false },
     role: {
       type: String,
-      enum: ["student", "lecturer", "admin", "finance_officer", "department_staff"],
+      enum: ["student", "alumni", "lecturer", "admin", "finance_officer", "department_staff"],
       default: "student",
       set: (value) => {
         const role = String(value || "student").toLowerCase();
@@ -68,6 +81,7 @@ const userSchema = new mongoose.Schema(
     },
     accountStatus: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
     studentProfile: { type: studentProfileSchema, default: undefined },
+    alumniProfile: { type: alumniProfileSchema, default: undefined },
     staffProfile: { type: staffProfileSchema, default: undefined },
     adminProfile: { type: adminProfileSchema, default: undefined }
   },
@@ -78,12 +92,21 @@ const emptyProfile = (profile) => !profile || Object.values(profile.toObject ? p
 
 userSchema.pre("validate", function validateProfileForRole() {
   if (this.role === "student") {
+    this.alumniProfile = undefined;
     this.staffProfile = undefined;
     this.adminProfile = undefined;
     if (!this.studentProfile?.studentId || !this.studentProfile?.nic || !this.studentProfile?.department) {
       this.invalidate("studentProfile", "Student ID, NIC, and department are required for student accounts.");
     }
+  } else if (this.role === "alumni") {
+    this.studentProfile = undefined;
+    this.staffProfile = undefined;
+    this.adminProfile = undefined;
+    if (!this.alumniProfile?.alumniId || !this.alumniProfile?.studentRegistrationNumber) {
+      this.invalidate("alumniProfile", "Alumni profile and student registration number are required.");
+    }
   } else if (["lecturer", "department_staff", "finance_officer"].includes(this.role)) {
+    this.alumniProfile = undefined;
     this.studentProfile = undefined;
     this.adminProfile = undefined;
     if (emptyProfile(this.staffProfile)) {
@@ -95,6 +118,7 @@ userSchema.pre("validate", function validateProfileForRole() {
     }
   } else if (this.role === "admin") {
     this.studentProfile = undefined;
+    this.alumniProfile = undefined;
     this.staffProfile = undefined;
     if (emptyProfile(this.adminProfile)) {
       this.adminProfile = { designation: "Administrator" };

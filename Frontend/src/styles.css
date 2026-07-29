@@ -209,6 +209,96 @@ body {
   font-synthesis-weight: none;
 }
 
+.website-loader-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 1rem;
+  min-height: 100vh;
+  padding: 2rem;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(13, 110, 253, 0.12), transparent 24rem),
+    radial-gradient(circle at 82% 78%, rgba(25, 184, 144, 0.12), transparent 22rem),
+    linear-gradient(180deg, #f8fbff 0%, #edf4fb 100%);
+  color: #0f172a;
+  text-align: center;
+}
+
+.website-loader-brand {
+  color: #0d6efd;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.loader {
+  width: fit-content;
+  font-family: system-ui, sans-serif;
+  font-size: clamp(2.3rem, 8vw, 4.75rem);
+  font-weight: bold;
+  line-height: 1;
+  text-transform: uppercase;
+  color: #0000;
+  -webkit-text-stroke: 1px #071527;
+  background:
+    radial-gradient(0.71em at 50% 1em, #071527 99%, #0000 101%) calc(50% - 1em) 1em / 2em 200% repeat-x text,
+    radial-gradient(0.71em at 50% -0.5em, #0000 99%, #071527 101%) 50% 1.5em / 2em 200% repeat-x text;
+  animation:
+    loader-wave-x 0.8s linear infinite alternate,
+    loader-wave-y 4s linear infinite;
+}
+
+.loader::before {
+  content: "Loading";
+}
+
+.website-loader-copy {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+@keyframes loader-wave-x {
+  to {
+    background-position-x: 50%, calc(50% + 1em);
+  }
+}
+
+@keyframes loader-wave-y {
+  to {
+    background-position-y: -0.5em, 0;
+  }
+}
+
+[data-site-theme="dark"] .website-loader-screen,
+.material-portal-dark .website-loader-screen {
+  background:
+    radial-gradient(circle at 18% 18%, rgba(56, 189, 248, 0.14), transparent 24rem),
+    radial-gradient(circle at 82% 78%, rgba(25, 184, 144, 0.1), transparent 22rem),
+    linear-gradient(180deg, #071527 0%, #0b1728 100%);
+  color: #f8fafc;
+}
+
+[data-site-theme="dark"] .loader,
+.material-portal-dark .loader {
+  -webkit-text-stroke-color: #f8fafc;
+  background:
+    radial-gradient(0.71em at 50% 1em, #f8fafc 99%, #0000 101%) calc(50% - 1em) 1em / 2em 200% repeat-x text,
+    radial-gradient(0.71em at 50% -0.5em, #0000 99%, #f8fafc 101%) 50% 1.5em / 2em 200% repeat-x text;
+}
+
+[data-site-theme="dark"] .website-loader-copy,
+.material-portal-dark .website-loader-copy {
+  color: #cbd5e1;
+}
+
 .maintenance-screen {
   display: flex;
   min-height: 100vh;
@@ -3681,6 +3771,17 @@ select.register-control {
   box-shadow: 0 0 0.62rem rgba(248, 113, 113, 0.95);
 }
 
+.alumni-register-shell { align-items: flex-start; }
+.alumni-register-card { max-width: 1240px; grid-template-columns: minmax(300px, .72fr) minmax(0, 1.6fr); }
+.alumni-register-form { gap: 26px; }
+.alumni-form-title { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; color: var(--md-text-primary, #202124); font-size: 1rem; font-weight: 900; }
+.alumni-section-help { margin: -7px 0 14px; color: var(--md-text-secondary, #64748b); font-size: .83rem; }
+.alumni-textarea { min-height: 78px; resize: vertical; padding-top: 12px; }
+.alumni-checkbox-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.alumni-checkbox-grid label { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--md-border, #dce3ec); border-radius: 10px; color: var(--md-text-primary, #202124); font-size: .88rem; font-weight: 650; }
+.alumni-checkbox-grid input { width: 17px; height: 17px; accent-color: var(--md-primary, #1a73e8); }
+@media (max-width: 900px) { .alumni-register-card { grid-template-columns: 1fr; } .alumni-checkbox-grid { grid-template-columns: 1fr; } }
+
 .ai-chat-shell {
   color: #f8fafc;
 }
@@ -4588,6 +4689,28 @@ select.register-control {
   color: var(--md-text-secondary);
   font-size: 0.875rem;
   line-height: 1.45;
+}
+
+/* Accessible accent text used by the messages page on light surfaces. */
+.messages-page {
+  --message-sky-text: #0369a1;
+  --message-blue-text: #1d4ed8;
+  --message-green-text: #047857;
+  --message-amber-text: #a16207;
+  --message-red-text: #b91c1c;
+  --message-violet-text: #6d28d9;
+  --message-teal-text: #0f766e;
+}
+
+.material-portal-dark .messages-page,
+[data-portal-theme="dark"] .material-portal .messages-page {
+  --message-sky-text: #7dd3fc;
+  --message-blue-text: #93c5fd;
+  --message-green-text: #6ee7b7;
+  --message-amber-text: #fcd34d;
+  --message-red-text: #fca5a5;
+  --message-violet-text: #c4b5fd;
+  --message-teal-text: #5eead4;
 }
 
 @media (max-width: 420px) {
@@ -7249,4 +7372,587 @@ textarea {
   cursor: not-allowed;
   opacity: 0.55;
   transform: none;
+}
+.alumni-social-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:1.25rem}.alumni-feed-shell{max-width:1380px;margin:auto}.alumni-feed-grid{display:grid;grid-template-columns:240px minmax(0,720px) 280px;gap:1.25rem;align-items:start}.alumni-feed-left,.alumni-feed-right{position:sticky;top:84px;display:grid;gap:1rem}.alumni-feed-profile-card,.alumni-feed-shortcuts,.alumni-feed-right>div{overflow:hidden;border:1px solid var(--md-border);border-radius:16px;background:var(--md-card);box-shadow:0 2px 8px rgba(15,23,42,.05)}.alumni-feed-profile-card{text-align:center;padding:0 1rem 1rem}.alumni-mini-cover{height:88px;margin:0 -1rem;background-color:#075985;background-image:linear-gradient(120deg,#062c67,#0878c9,#0c4a6e);background-position:center;background-size:cover}.alumni-mini-avatar-link{display:flex!important;width:88px;height:88px;margin:-44px auto 10px!important;align-items:center;justify-content:center;border:4px solid var(--md-card);border-radius:50%;background:var(--md-card);overflow:hidden}.alumni-mini-avatar-link img,.alumni-mini-avatar-link>span{width:80px!important;height:80px!important}.alumni-feed-profile-card h2{font-size:1rem;font-weight:900}.alumni-feed-profile-card p,.alumni-feed-profile-card small{display:block;color:var(--md-text-secondary)}.alumni-feed-profile-card>a:not(.alumni-mini-avatar-link){display:flex;align-items:center;justify-content:center;gap:.4rem;margin-top:1rem;color:#0284c7;font-weight:800}.alumni-feed-shortcuts{padding:.5rem}.alumni-feed-shortcuts a{display:flex;align-items:center;gap:.75rem;padding:.75rem;border-radius:10px;font-weight:700}.alumni-feed-shortcuts a:hover{background:var(--md-hover)}.alumni-feed-shortcuts svg{width:18px}.alumni-feed-stream{display:grid;gap:1.25rem}.alumni-feed-right>div{padding:1.15rem}.alumni-feed-right h2{font-size:1rem;font-weight:900}.alumni-feed-right p,.alumni-feed-right li{margin:.5rem 0;color:var(--md-text-secondary);font-size:.86rem}.alumni-feed-right ul{padding-left:1rem;list-style:disc}
+
+.alumni-chat-page{max-width:1400px;margin:auto}.alumni-messenger{display:grid;grid-template-columns:350px minmax(0,1fr);height:calc(100vh - 205px);min-height:590px;overflow:hidden;border:1px solid var(--md-border);border-radius:18px;background:var(--md-card);box-shadow:0 12px 36px rgba(15,23,42,.08)}.alumni-chat-list{overflow:auto;border-right:1px solid var(--md-border)}.alumni-chat-search{display:flex;align-items:center;gap:.5rem;margin:1rem;padding:.75rem;border-radius:10px;background:var(--md-hover)}.alumni-chat-search input{min-width:0;flex:1;background:transparent;outline:none}.alumni-chat-row{display:flex;width:100%;align-items:center;gap:.8rem;padding:1rem;border-top:1px solid var(--md-border);text-align:left}.alumni-chat-row:hover,.alumni-chat-row.active{background:color-mix(in srgb,#0ea5e9 12%,var(--md-card))}.alumni-chat-row>span:last-child{min-width:0}.alumni-chat-row b,.alumni-chat-row small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.alumni-chat-row small{color:var(--md-text-secondary)}.alumni-chat-icon{display:grid;width:44px;height:44px;flex:0 0 44px;place-items:center;border-radius:50%;background:#e0f2fe;color:#0369a1}.alumni-chat-thread{display:flex;min-width:0;flex-direction:column}.alumni-chat-thread>header{display:flex;align-items:center;gap:.8rem;padding:1rem 1.25rem;border-bottom:1px solid var(--md-border)}.alumni-chat-thread>header small{display:block;color:var(--md-text-secondary)}.alumni-chat-messages{flex:1;overflow:auto;padding:1.25rem;background:linear-gradient(rgba(248,250,252,.7),rgba(241,245,249,.55));color:#172033}.material-portal-dark .alumni-chat-messages{background:#111827;color:#f8fafc}.alumni-message{display:flex;align-items:flex-end;gap:.6rem;margin:.8rem 0}.alumni-message.mine{flex-direction:row-reverse}.alumni-message>div{max-width:min(70%,650px)}.alumni-message p{padding:.7rem .9rem;border-radius:4px 16px 16px 16px;background:white;box-shadow:0 1px 4px #0001;white-space:pre-wrap}.alumni-message.mine p{border-radius:16px 4px 16px 16px;background:#0b7ac2;color:white}.alumni-message small,.alumni-message time{display:block;padding:.15rem .4rem;color:var(--md-text-secondary);font-size:.7rem}.alumni-message button{opacity:.5}.alumni-message button:hover{opacity:1;color:#dc2626}.alumni-chat-composer{display:flex;gap:.75rem;padding:1rem;border-top:1px solid var(--md-border)}.alumni-chat-composer input{flex:1;border:1px solid var(--md-border);border-radius:999px;background:var(--md-hover);padding:.8rem 1rem;outline:none}.alumni-chat-composer button{display:grid;width:46px;place-items:center;border-radius:50%;background:#0878c9;color:#fff}.alumni-chat-empty{display:grid;height:100%;place-content:center;text-align:center;color:var(--md-text-secondary)}.alumni-chat-empty svg{margin:auto}.alumni-modal-backdrop{position:fixed;z-index:1500;inset:0;display:grid;place-items:center;padding:1rem;background:#02061799}.alumni-create-chat{width:min(620px,100%);max-height:85vh;padding:1.5rem;border-radius:18px;background:var(--md-card);box-shadow:0 25px 80px #0005}.alumni-create-chat h2{font-size:1.35rem;font-weight:900}.alumni-create-chat>p{margin:.25rem 0 1rem;color:var(--md-text-secondary)}.alumni-member-picker{max-height:50vh;overflow:auto;margin:1rem 0;border-block:1px solid var(--md-border)}.alumni-member-picker label{display:flex;align-items:center;gap:.7rem;padding:.65rem}.alumni-member-picker label:hover{background:var(--md-hover)}.alumni-member-picker small{display:block;color:var(--md-text-secondary)}.alumni-create-chat footer{display:flex;justify-content:flex-end;gap:.5rem}
+
+.alumni-admin-tabs{display:flex;flex-wrap:wrap;gap:.5rem}.alumni-admin-tabs button{display:flex;align-items:center;gap:.5rem;padding:.65rem 1rem;border:1px solid var(--md-border);border-radius:999px;background:var(--md-card);font-weight:800}.alumni-admin-tabs button.active{border-color:#0878c9;background:#0878c9;color:#fff}.alumni-admin-posts,.alumni-admin-users{display:grid;gap:1rem}.alumni-admin-users>div{display:flex;align-items:center;justify-content:space-between;gap:1rem}.alumni-admin-users small{display:block;color:var(--md-text-secondary)}.alumni-admin-users>div>div:last-child{display:flex;flex-wrap:wrap;gap:.5rem}.alumni-admin-chat{display:grid;grid-template-columns:300px 1fr;min-height:600px;overflow:hidden;border:1px solid var(--md-border);border-radius:16px;background:var(--md-card)}.alumni-admin-chat>aside{border-right:1px solid var(--md-border)}.alumni-admin-chat>aside button{display:block;width:100%;padding:1rem;border-bottom:1px solid var(--md-border);text-align:left}.alumni-admin-chat>aside button.active{background:var(--md-hover)}.alumni-admin-chat small{display:block;color:var(--md-text-secondary)}.alumni-admin-chat main>header{display:flex;justify-content:space-between;padding:1rem;border-bottom:1px solid var(--md-border)}.alumni-admin-chat main>div{max-height:540px;overflow:auto}.alumni-admin-chat article{display:flex;justify-content:space-between;gap:1rem;padding:1rem;border-bottom:1px solid var(--md-border)}.alumni-linkedin-profile{max-width:1060px;margin:auto}.alumni-linkedin-profile>section{border-radius:12px!important}.alumni-linkedin-profile>section:first-of-type{box-shadow:0 5px 18px rgba(15,23,42,.1)}
+
+@media(max-width:1150px){.alumni-feed-grid{grid-template-columns:220px minmax(0,1fr)}.alumni-feed-right{display:none}}@media(max-width:800px){.alumni-social-heading{align-items:stretch;flex-direction:column}.alumni-feed-grid{display:block}.alumni-feed-left{position:static;margin-bottom:1rem}.alumni-feed-shortcuts{display:grid;grid-template-columns:1fr 1fr}.alumni-messenger{grid-template-columns:110px minmax(0,1fr)}.alumni-chat-search{display:none}.alumni-chat-row{justify-content:center}.alumni-chat-row>span:last-child{display:none}.alumni-admin-chat{grid-template-columns:120px 1fr}.alumni-admin-chat>aside small{display:none}}@media(max-width:560px){.alumni-messenger{display:block;height:auto}.alumni-chat-list{display:flex;border-right:0;border-bottom:1px solid var(--md-border);overflow-x:auto}.alumni-chat-row{width:auto}.alumni-chat-thread{height:65vh}.alumni-admin-chat{display:block}.alumni-admin-chat>aside{display:flex;overflow:auto}.alumni-admin-chat>aside button{min-width:150px}.alumni-admin-users>div{align-items:flex-start;flex-direction:column}}
+.saved-post-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:1rem}.saved-post-preview{position:relative;display:flex;min-height:180px;overflow:hidden;border:1px solid var(--md-border);border-radius:16px;background:var(--md-card);box-shadow:0 4px 14px rgba(15,23,42,.06);transition:transform .18s,box-shadow .18s}.saved-post-preview:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(15,23,42,.12)}.saved-post-preview>img,.saved-post-placeholder{width:125px;flex:0 0 125px;object-fit:cover}.saved-post-placeholder{display:grid;place-items:center;background:linear-gradient(135deg,#e0f2fe,#dbeafe);color:#0369a1}.saved-post-content{display:flex;min-width:0;flex:1;flex-direction:column;padding:1rem}.saved-post-content header{display:flex;align-items:center;gap:.6rem}.saved-post-content header small,.saved-generic-item small{display:block;color:var(--md-text-secondary)}.saved-post-content>p{display:-webkit-box;overflow:hidden;margin:.8rem 0;line-height:1.45;-webkit-box-orient:vertical;-webkit-line-clamp:3}.saved-post-content footer{display:flex;justify-content:space-between;gap:.5rem;margin-top:auto;color:#0878c9;font-size:.78rem;font-weight:800}.saved-post-content footer span{display:flex;align-items:center;gap:.3rem}.saved-post-delete{position:absolute;right:.55rem;top:.55rem;display:grid;width:32px;height:32px;place-items:center;border-radius:50%;background:var(--md-card);color:#dc2626;box-shadow:0 2px 8px #0002}.saved-generic-item{align-items:center;gap:1rem;padding:1.25rem}.alumni-feed-stream article:target{outline:3px solid #0ea5e9;outline-offset:3px;animation:saved-post-focus 1.8s ease}@keyframes saved-post-focus{0%,45%{box-shadow:0 0 0 10px rgba(14,165,233,.22)}100%{box-shadow:0 2px 8px rgba(15,23,42,.06)}}@media(max-width:480px){.saved-post-preview{flex-direction:column}.saved-post-preview>img,.saved-post-placeholder{width:100%;height:150px;flex-basis:150px}}
+.alumni-social-feature-nav{position:relative;z-index:30;display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin:-.25rem 0 1.25rem;padding:.45rem;border:1px solid var(--md-border);border-radius:14px;background:var(--md-card);box-shadow:0 2px 8px rgba(15,23,42,.05)}.alumni-social-links{display:flex;min-width:0;align-items:center;gap:.25rem}.alumni-social-links>a{display:flex;align-items:center;gap:.45rem;padding:.65rem .8rem;border-radius:10px;color:var(--md-text-secondary);font-size:.84rem;font-weight:800;white-space:nowrap}.alumni-social-links>a:hover,.alumni-social-links>a.active{background:#e0f2fe;color:#0369a1}.alumni-nav-profile-search{position:relative;display:flex;width:min(280px,100%);min-width:190px;align-items:center;gap:.45rem;border:1px solid var(--md-border);border-radius:999px;background:var(--md-hover);padding:.58rem .75rem;color:var(--md-text-secondary)}.alumni-nav-profile-search:focus-within{border-color:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,.14)}.alumni-nav-profile-search input{width:100%;min-width:0;appearance:none;border:0;border-radius:0;background:transparent!important;box-shadow:none!important;color:var(--md-text-primary);font:inherit;font-size:.84rem;line-height:1.25;margin:0;padding:0;outline:0}.alumni-nav-profile-search input:focus{border:0;background:transparent!important;box-shadow:none!important;outline:0}.alumni-nav-profile-search input::-webkit-search-decoration,.alumni-nav-profile-search input::-webkit-search-cancel-button,.alumni-nav-profile-search input::-webkit-search-results-button,.alumni-nav-profile-search input::-webkit-search-results-decoration{display:none}.alumni-nav-profile-search input:-webkit-autofill,.alumni-nav-profile-search input:-webkit-autofill:hover,.alumni-nav-profile-search input:-webkit-autofill:focus{-webkit-text-fill-color:var(--md-text-primary);box-shadow:0 0 0 1000px var(--md-hover) inset!important}.alumni-nav-profile-search>button{display:grid;flex:0 0 auto;place-items:center;border-radius:50%}.alumni-search-spinner{flex:0 0 auto;animation:alumni-search-spin .8s linear infinite}@keyframes alumni-search-spin{to{transform:rotate(360deg)}}.alumni-nav-search-results{position:absolute;z-index:50;top:calc(100% + .6rem);right:0;width:min(360px,calc(100vw - 2rem));overflow:hidden;border:1px solid var(--md-border);border-radius:14px;background:var(--md-card);box-shadow:0 16px 40px rgba(15,23,42,.2)}.alumni-nav-search-results>a{display:flex;align-items:center;gap:.7rem;border-radius:0;padding:.7rem .85rem;color:var(--md-text-primary);font-weight:400}.alumni-nav-search-results>a:hover{background:var(--md-hover);color:var(--md-text-primary)}.alumni-nav-search-results>a>span{min-width:0}.alumni-nav-search-results strong,.alumni-nav-search-results small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.alumni-nav-search-results strong{font-size:.86rem}.alumni-nav-search-results small{margin-top:.1rem;color:var(--md-text-secondary);font-size:.72rem}.alumni-nav-search-results>p{padding:1rem;text-align:center;color:var(--md-text-secondary);font-size:.82rem}.material-portal-dark .alumni-social-links>a:hover,.material-portal-dark .alumni-social-links>a.active{background:rgba(14,165,233,.16);color:#7dd3fc}@media(max-width:1050px){.alumni-social-feature-nav{align-items:stretch;flex-direction:column}.alumni-social-links{overflow-x:auto}.alumni-nav-profile-search{width:100%}.alumni-nav-search-results{right:auto;left:0;width:100%}}@media(max-width:600px){.alumni-social-links{display:grid;grid-template-columns:1fr 1fr;width:100%;overflow:visible}.alumni-social-links>a{justify-content:center}.alumni-social-links>a:first-child{grid-column:1/-1}}
+.alumni-social-count{display:grid;min-width:20px;height:20px;place-items:center;border-radius:999px;background:#dc2626;color:#fff!important;font-size:.68rem;font-weight:900;line-height:1;padding:0 5px}
+.profile-accordion-heading{display:flex;width:100%;align-items:center;justify-content:space-between;gap:1rem;padding:1.1rem 1.5rem;text-align:left;font-weight:900}.profile-accordion-heading:hover{background:var(--md-hover)}.profile-accordion-heading>span{display:flex;align-items:center;gap:.65rem}.profile-accordion-heading svg{transition:transform .2s}.profile-post-card{overflow:hidden;border:1px solid var(--md-border);border-radius:14px;background:var(--md-card);padding:1rem}.profile-post-card>header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}.profile-post-card small{display:block;color:var(--md-text-secondary);font-size:.75rem}.profile-post-card>footer{margin-top:1rem;border-top:1px solid var(--md-border);padding-top:.75rem;color:var(--md-text-secondary);font-size:.78rem}.profile-post-media{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.5rem;margin-top:1rem}.profile-post-media img{width:100%;max-height:260px;border-radius:10px;object-fit:cover}.profile-post-media a{display:flex;align-items:center;gap:.5rem;border-radius:10px;background:var(--md-hover);padding:1rem;font-weight:700}@media(max-width:520px){.profile-post-card>header{flex-direction:column}.profile-accordion-heading{padding:1rem}}
+.alumni-linkedin-profile,.alumni-public-profile{width:100%;max-width:1368px}.alumni-facebook-profile-hero{overflow:hidden;border:1px solid var(--md-border);border-radius:12px;background:var(--md-card);box-shadow:0 2px 10px rgba(15,23,42,.08)}.alumni-profile-cover{position:relative;height:clamp(230px,34vw,505px);border-radius:11px 11px 8px 8px;background-color:#164e63;background-image:linear-gradient(120deg,#0c4a6e,#2563eb,#7c3aed);background-position:center;background-size:cover}.alumni-cover-edit{position:absolute;right:2.5rem;bottom:1.25rem;display:flex;cursor:pointer;align-items:center;gap:.5rem;border-radius:9px;background:#fff;padding:.7rem 1rem;color:#111827;font-size:.88rem;font-weight:800;box-shadow:0 2px 8px rgba(0,0,0,.18)}.alumni-cover-edit:hover{background:#f1f5f9}.alumni-profile-summary{display:grid;grid-template-columns:210px minmax(0,1fr) auto;align-items:center;gap:1.4rem;min-height:185px;margin:0 3.75rem;padding:0 0 1rem;border-bottom:1px solid var(--md-border)}.alumni-profile-avatar{align-self:start;height:135px}.alumni-profile-avatar-frame{position:relative;width:200px;height:200px;transform:translateY(-34px);border:4px solid var(--md-card);border-radius:50%;background:var(--md-card);box-shadow:0 0 0 2px #94a3b8;overflow:visible}.alumni-profile-avatar-frame>img,.alumni-profile-avatar-frame>span{width:100%!important;height:100%!important;border-radius:50%;font-size:3rem}.alumni-avatar-edit{position:absolute;right:3px;bottom:12px;display:grid;width:42px;height:42px;cursor:pointer;place-items:center;border:3px solid var(--md-card);border-radius:50%;background:#e2e8f0;color:#111827}.alumni-avatar-edit:hover{background:#cbd5e1}.alumni-profile-identity{min-width:0;padding-top:.8rem}.alumni-profile-name{display:flex;align-items:center;gap:.55rem}.alumni-profile-name h1{overflow:hidden;font-size:clamp(1.8rem,3vw,2.35rem);font-weight:900;letter-spacing:-.035em;line-height:1.1;text-overflow:ellipsis}.alumni-profile-identity>b{display:block;margin-top:.5rem;font-size:.9rem}.alumni-profile-identity>p{margin-top:.35rem;color:var(--md-text-secondary);font-size:.95rem}.alumni-profile-facts{display:flex;flex-wrap:wrap;gap:.45rem 1rem;margin-top:.5rem;font-size:.86rem;font-weight:700}.alumni-profile-facts span{display:flex;align-items:center;gap:.3rem}.alumni-profile-owner-actions,.alumni-profile-visitor-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:.55rem;padding-top:1rem}.alumni-profile-introduction{max-width:900px;margin:.2rem 3.75rem 1.2rem;white-space:pre-wrap;line-height:1.6}.material-portal-dark .alumni-cover-edit{background:#f8fafc;color:#111827}.material-portal-dark .alumni-avatar-edit{background:#e2e8f0;color:#111827}@media(max-width:850px){.alumni-profile-summary{grid-template-columns:155px minmax(0,1fr);margin:0 1.5rem}.alumni-profile-avatar{height:105px}.alumni-profile-avatar-frame{width:150px;height:150px}.alumni-profile-owner-actions,.alumni-profile-visitor-actions{grid-column:1/-1;justify-content:flex-start;padding:0 0 .5rem}.alumni-profile-introduction{margin-inline:1.5rem}.alumni-cover-edit{right:1rem}}@media(max-width:560px){.alumni-profile-cover{height:220px}.alumni-cover-edit{bottom:.75rem;padding:.6rem}.alumni-cover-edit span{display:none}.alumni-profile-summary{display:flex;align-items:flex-start;flex-direction:column;gap:.5rem;margin:0 1rem;padding-bottom:1rem}.alumni-profile-avatar{height:75px}.alumni-profile-avatar-frame{width:126px;height:126px;transform:translateY(-52px)}.alumni-avatar-edit{right:-1px;bottom:5px;width:37px;height:37px}.alumni-profile-identity{padding-top:0}.alumni-profile-name h1{font-size:1.65rem}.alumni-profile-owner-actions,.alumni-profile-visitor-actions{width:100%;padding-top:.5rem}.alumni-profile-owner-actions>a,.alumni-profile-owner-actions>button,.alumni-profile-visitor-actions>button,.alumni-profile-visitor-actions>a{flex:1;justify-content:center}.alumni-profile-introduction{margin-inline:1rem}}
+.alumni-profile-owner-actions>button[type="submit"]{display:none}.alumni-profile-editor-backdrop{position:fixed;z-index:1600;inset:0;display:grid;place-items:center;padding:1rem;background:rgba(2,6,23,.72);backdrop-filter:blur(4px)}.alumni-profile-editor{display:flex;width:min(900px,100%);max-height:calc(100dvh - 2rem);overflow:hidden;flex-direction:column;border:1px solid var(--md-border);border-radius:18px;background:var(--md-bg);box-shadow:0 28px 90px rgba(0,0,0,.38)}.alumni-profile-editor>header{display:flex;flex:0 0 auto;align-items:flex-start;justify-content:space-between;gap:1rem;border-bottom:1px solid var(--md-border);background:var(--md-card);padding:1.1rem 1.35rem}.alumni-profile-editor>header h2{font-size:1.45rem;font-weight:900}.alumni-profile-editor>header p:last-child{color:var(--md-text-secondary);font-size:.83rem}.alumni-profile-editor>header>button{display:grid;width:40px;height:40px;flex:0 0 40px;place-items:center;border-radius:50%;background:var(--md-hover)}.alumni-profile-editor-content{display:grid;gap:1rem;overflow-y:auto;padding:1.25rem;overscroll-behavior:contain}.alumni-profile-editor-content>.portal-btn-primary{position:sticky;z-index:3;bottom:0;width:100%;justify-content:center;padding:.85rem;box-shadow:0 -8px 20px var(--md-bg)}@media(max-width:560px){.alumni-profile-editor-backdrop{padding:0}.alumni-profile-editor{width:100%;height:100dvh;max-height:none;border:0;border-radius:0}.alumni-profile-editor-content{padding:.8rem}.alumni-profile-editor>header{padding:1rem}}
+.alumni-profile-editor-page{width:100%;border-top:1px solid var(--md-border);padding-top:1rem}.alumni-profile-editor-page>header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;border:1px solid var(--md-border);border-radius:12px;background:var(--md-card);padding:1.25rem 1.5rem;box-shadow:0 2px 8px rgba(15,23,42,.06)}.alumni-profile-editor-page>header h2{font-size:1.55rem;font-weight:900}.alumni-profile-editor-page>header p:last-child{margin-top:.2rem;color:var(--md-text-secondary);font-size:.88rem}.alumni-profile-editor-page>header>button{display:grid;width:40px;height:40px;flex:0 0 40px;place-items:center;border-radius:50%;background:var(--md-hover)}.alumni-profile-editor-page .alumni-profile-editor-content{display:grid;gap:1rem;overflow:visible;padding:1rem 0 0}.alumni-profile-editor-page .alumni-profile-editor-content>.portal-btn-primary{position:static;width:100%;justify-content:center;padding:.9rem;box-shadow:none}.alumni-photo-crop-editor{overflow:hidden;border:1px solid var(--md-border);border-radius:12px;background:var(--md-card)}.alumni-photo-crop-editor>header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding:1rem 1.2rem}.alumni-photo-crop-editor>header h3{font-size:1.05rem;font-weight:900}.alumni-photo-crop-editor>header p{color:var(--md-text-secondary);font-size:.8rem}.alumni-photo-crop-editor>header>button{display:grid;width:34px;height:34px;place-items:center;border-radius:50%;background:var(--md-hover)}.alumni-crop-stage{display:grid;max-width:100%;margin:auto;place-items:center;overflow:hidden;background:#111827;touch-action:none;user-select:none}.alumni-crop-stage.profile{width:min(520px,100%);border-radius:50%}.alumni-crop-stage.cover{width:100%}.alumni-crop-stage canvas{display:block;width:100%;height:auto;cursor:grab;touch-action:none}.alumni-crop-stage canvas:active{cursor:grabbing}.alumni-crop-controls{display:flex;align-items:center;gap:.75rem;padding:1rem 1.2rem}.alumni-crop-controls label{display:flex;min-width:0;flex:1;align-items:center;gap:.7rem;font-size:.82rem;font-weight:800}.alumni-crop-controls input{width:100%;accent-color:#1684ff}@media(max-width:560px){.alumni-profile-editor-page>header{padding:1rem}.alumni-profile-editor-page .alumni-profile-editor-content{padding-top:.75rem}.alumni-crop-controls{align-items:stretch;flex-wrap:wrap}.alumni-crop-controls label{flex-basis:100%}.alumni-crop-controls button{flex:1;justify-content:center}}
+.alumni-linkedin-profile{display:flex;flex-direction:column}.alumni-profile-connections{order:1}.alumni-profile-editor-page{order:2}.alumni-profile-activity{order:3}
+.alumni-profile-activity{width:100%;box-sizing:border-box;border:1px solid var(--md-border)!important;border-radius:16px!important;background:color-mix(in srgb,var(--md-hover) 68%,var(--md-bg))!important;padding:clamp(1rem,2.5vw,2rem)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 2px 10px rgba(15,23,42,.05)!important}.alumni-profile-activity>.mb-4,.alumni-profile-post-feed{width:min(720px,100%);margin-right:auto;margin-left:auto}.alumni-profile-activity>.mb-4{min-height:54px;margin-bottom:1rem!important;padding:0 .15rem}.alumni-profile-post-feed{display:grid;align-items:start;gap:1.25rem}.alumni-profile-post-feed>.alumni-facebook-post-card{width:100%;min-width:0;margin:0}.material-portal-dark .alumni-profile-activity{background:color-mix(in srgb,var(--md-hover) 55%,var(--md-bg))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 2px 10px rgba(0,0,0,.18)!important}@media(max-width:600px){.alumni-profile-activity{border-right:0!important;border-left:0!important;border-radius:0!important;padding:1rem .65rem!important}.alumni-profile-activity>.mb-4{padding-inline:.35rem}.alumni-profile-post-feed{gap:1rem}}
+.alumni-profile-connections{width:min(510px,100%);margin-inline:auto;border:1px solid var(--md-border);border-radius:14px;background:var(--md-card);padding:.85rem;box-shadow:0 2px 8px rgba(15,23,42,.06)}.alumni-profile-connections>header{display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.7rem}.alumni-profile-connections h2{font-size:1.05rem;font-weight:900}.alumni-profile-connections header p,.alumni-profile-connections small{color:var(--md-text-secondary);font-size:.7rem}.alumni-profile-connections header button{color:#0866ff;font-size:.8rem;font-weight:700}.alumni-profile-connections header button:hover{text-decoration:underline}.alumni-profile-connection-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem .55rem}.alumni-profile-connection-grid.show-all{grid-template-columns:repeat(auto-fill,minmax(115px,1fr))}.alumni-profile-connection-grid>a{min-width:0;color:var(--md-text-primary)}.alumni-profile-connection-grid img,.alumni-profile-connection-grid>a>span{display:grid;width:100%;aspect-ratio:1/1;place-items:center;border:1px solid var(--md-border);border-radius:8px;background:var(--md-hover);object-fit:cover;font-size:1.7rem;font-weight:900}.alumni-profile-connection-grid strong,.alumni-profile-connection-grid small{display:block;overflow:hidden;text-overflow:ellipsis}.alumni-profile-connection-grid strong{margin-top:.28rem;font-size:.72rem;line-height:1.15;white-space:nowrap}.alumni-profile-connection-grid small{margin-top:.08rem;white-space:nowrap}.alumni-profile-connection-grid>a:hover strong{color:#0866ff;text-decoration:underline}.alumni-connections-loading{padding:1.5rem 0;text-align:center;color:var(--md-text-secondary);font-size:.8rem}@media(max-width:520px){.alumni-profile-connections{width:100%;border-radius:12px;padding:.7rem}.alumni-profile-connection-grid{gap:.55rem .45rem}.alumni-profile-connections header button{font-size:.74rem}}
+.alumni-public-post-feed-section{width:100%;border:1px solid var(--md-border)!important;border-radius:16px!important;background:color-mix(in srgb,var(--md-hover) 68%,var(--md-bg))!important;padding:clamp(1rem,2.5vw,2rem)!important;box-shadow:0 2px 10px rgba(15,23,42,.05)!important}.alumni-public-post-feed-section>.classroom-section-title,.alumni-public-post-feed{width:min(720px,100%);margin-inline:auto}.alumni-public-post-feed-section>.classroom-section-title{margin-bottom:1rem;padding-inline:.15rem}.alumni-public-post-feed{display:grid;gap:1.25rem}.alumni-public-post-feed>.alumni-facebook-post-card{width:100%;min-width:0;margin:0}.material-portal-dark .alumni-public-post-feed-section{background:color-mix(in srgb,var(--md-hover) 55%,var(--md-bg))!important}@media(max-width:600px){.alumni-public-post-feed-section{border-right:0!important;border-left:0!important;border-radius:0!important;padding:1rem .65rem!important}.alumni-public-post-feed{gap:1rem}}
+.alumni-chat-attach{display:grid;width:44px;flex:0 0 44px;cursor:pointer;place-items:center;border-radius:50%;background:var(--md-hover);color:#0878c9}.alumni-chat-attach input{display:none}.alumni-chat-attachment-list{display:flex;flex-wrap:wrap;gap:.4rem;padding:.55rem 1rem 0}.alumni-chat-attachment-list>span{display:flex;max-width:240px;align-items:center;gap:.35rem;border-radius:999px;background:var(--md-hover);padding:.4rem .6rem;font-size:.75rem}.alumni-chat-attachment-list>span button{display:grid;place-items:center}.alumni-message-attachments{display:grid;gap:.4rem;margin-top:.35rem}.alumni-message-attachments img,.alumni-message-attachments video{display:block;max-width:min(360px,100%);max-height:330px;border-radius:12px;background:#000;object-fit:cover}.alumni-chat-file{display:flex;max-width:320px;align-items:center;gap:.6rem;border:1px solid var(--md-border);border-radius:12px;background:var(--md-card);padding:.8rem;color:var(--md-text-primary);font-weight:700}.alumni-chat-file span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.alumni-guideline-warning{display:flex;align-items:flex-start;gap:.75rem;margin:1rem auto;max-width:760px;border:1px solid #f59e0b;border-radius:14px;background:#fffbeb;padding:.9rem 1rem;color:#78350f;box-shadow:0 2px 8px rgba(120,53,15,.08)}.alumni-guideline-warning>svg{flex:0 0 auto;color:#d97706}.alumni-guideline-warning p{margin:.15rem 0;white-space:pre-wrap}.alumni-guideline-warning small{color:#92400e}.alumni-warning-actions{display:flex;flex-wrap:wrap;gap:.4rem;margin-left:auto}.alumni-warning-actions button,.alumni-message-actions button{display:flex;align-items:center;gap:.25rem;border:1px solid currentColor;border-radius:999px;padding:.3rem .55rem;font-size:.72rem;font-weight:800}.alumni-message-actions{display:flex;gap:.35rem;margin-top:.3rem;padding:0 .35rem;color:var(--md-text-secondary)}.alumni-message-actions button:hover,.alumni-warning-actions button:hover{color:#dc2626}.material-portal-dark .alumni-guideline-warning{border-color:#92400e;background:#422006;color:#fef3c7}.material-portal-dark .alumni-guideline-warning small{color:#fcd34d}
+.alumni-delete-chat{display:grid;width:36px;height:36px;flex:0 0 36px;place-items:center;border-radius:50%;color:#dc2626}.alumni-delete-chat:hover{background:#fee2e2}.alumni-message-controls{position:relative;display:flex!important;max-width:none!important;align-items:center;gap:.25rem}.alumni-message-controls>button{display:grid;width:28px;height:28px;place-items:center;border-radius:50%}.alumni-message-controls>button:hover{background:var(--md-hover)}.alumni-reaction-picker{position:absolute;z-index:20;bottom:34px;left:0;display:flex!important;max-width:none!important;gap:.15rem;border:1px solid var(--md-border);border-radius:999px;background:var(--md-card);padding:.3rem;box-shadow:0 8px 24px #0002}.alumni-message.mine .alumni-reaction-picker{right:0;left:auto}.alumni-reaction-picker button{width:32px;height:32px;border-radius:50%;font-size:1.05rem;opacity:1}.alumni-reaction-picker button:hover{background:var(--md-hover);transform:scale(1.12)}.alumni-message-reactions{display:flex!important;max-width:none!important;flex-wrap:wrap;gap:.25rem;margin-top:-.15rem;padding:0 .35rem}.alumni-message-reactions button{border:1px solid var(--md-border);border-radius:999px;background:var(--md-card);padding:.15rem .45rem;font-size:.72rem;opacity:1}.alumni-message-edit{display:flex!important;max-width:none!important;align-items:center;gap:.35rem;border-radius:14px;background:var(--md-card);padding:.4rem;box-shadow:0 1px 4px #0002}.alumni-message-edit input{min-width:180px;flex:1;border:1px solid var(--md-border);border-radius:10px;background:var(--md-hover);padding:.55rem .65rem;outline:none}.alumni-message-edit button{display:grid;width:30px;height:30px;place-items:center;border-radius:50%;background:var(--md-hover);opacity:1}
+.alumni-chat-page{width:100%;min-width:0;overflow-x:clip}.alumni-messenger{height:clamp(520px,calc(100dvh - 250px),780px);min-height:0;overscroll-behavior:contain}.alumni-chat-list,.alumni-chat-thread,.alumni-chat-messages{min-height:0}.alumni-chat-list{overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}.alumni-chat-thread{overflow:hidden}.alumni-chat-thread>header,.alumni-chat-composer,.alumni-chat-attachment-list{flex:0 0 auto}.alumni-chat-thread>header{min-width:0}.alumni-chat-thread>header>div:nth-child(2){min-width:0}.alumni-chat-thread>header>div:nth-child(2) b,.alumni-chat-thread>header>div:nth-child(2) small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.alumni-chat-messages{overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;overflow-anchor:auto}.alumni-message{min-width:0}.alumni-message>div:not(.alumni-message-controls){min-width:0;overflow-wrap:anywhere}.alumni-message p{overflow-wrap:anywhere;word-break:break-word}.alumni-chat-composer{min-width:0;background:var(--md-card)}.alumni-chat-composer input{min-width:0}.alumni-chat-composer button{height:46px;flex:0 0 46px}.alumni-chat-attachment-list{max-height:110px;overflow-x:hidden;overflow-y:auto}.alumni-message-attachments img,.alumni-message-attachments video{max-width:100%}.alumni-chat-file{max-width:100%}
+@media(max-height:760px) and (min-width:561px){.alumni-messenger{height:calc(100dvh - 220px);min-height:420px}}
+@media(max-width:560px){.alumni-messenger{display:grid;height:calc(100dvh - 205px);min-height:520px;grid-template-rows:auto minmax(0,1fr)}.alumni-chat-list{display:flex;max-height:76px;overflow-x:auto;overflow-y:hidden;border-right:0;border-bottom:1px solid var(--md-border);scrollbar-gutter:auto}.alumni-chat-row{width:auto;min-width:76px;flex:0 0 auto;padding:.65rem}.alumni-chat-thread{height:auto;min-height:0}.alumni-chat-thread>header{padding:.7rem}.alumni-chat-messages{padding:.8rem}.alumni-message>div:not(.alumni-message-controls){max-width:min(78%,650px)}.alumni-chat-composer{gap:.45rem;padding:.65rem}.alumni-chat-attach{width:40px;flex-basis:40px}.alumni-chat-composer button{width:40px;height:40px;flex-basis:40px}.alumni-reaction-picker{max-width:calc(100vw - 32px)!important}}
+.alumni-chat-suspended{display:flex;flex:0 0 auto;align-items:center;gap:.75rem;border-top:1px solid #f59e0b;background:#fffbeb;padding:.8rem 1rem;color:#78350f}.alumni-chat-suspended>svg{flex:0 0 auto;color:#d97706}.alumni-chat-suspended>div{min-width:0;flex:1}.alumni-chat-suspended p,.alumni-chat-suspended small{display:block;font-size:.78rem}.alumni-chat-suspended button{flex:0 0 auto}.material-portal-dark .alumni-chat-suspended{background:#422006;color:#fef3c7}@media(max-width:560px){.alumni-chat-suspended{align-items:flex-start;flex-wrap:wrap}.alumni-chat-suspended button{width:100%;justify-content:center}}
+.alumni-comment-thread {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.2rem 0;
+  font-size: 0.875rem;
+}
+
+.alumni-comment-bubble {
+  position: relative;
+  width: fit-content;
+  min-width: 9rem;
+  max-width: min(100%, 34rem);
+  border-radius: 1.35rem;
+  background: var(--md-hover);
+  padding: 0.65rem 2rem 0.65rem 0.9rem;
+  color: var(--md-text-primary);
+}
+
+.alumni-comment-bubble > b {
+  display: block;
+  line-height: 1.2;
+}
+
+.alumni-comment-bubble > p {
+  margin-top: 0.15rem;
+  line-height: 1.42;
+}
+
+.alumni-comment-media {
+  display: block;
+  max-height: 8rem;
+  max-width: 12rem;
+  border: 1px solid var(--md-border);
+  border-radius: 0.75rem;
+  object-fit: cover;
+}
+
+.alumni-comment-media-wrap {
+  display: block;
+  width: fit-content;
+  margin-top: 0.4rem;
+  margin-left: 0.3rem;
+}
+
+.alumni-comment-children {
+  position: relative;
+  margin-top: 0.45rem;
+  margin-left: -2.3rem;
+  padding-left: 2.7rem;
+}
+
+.alumni-comment-children::before {
+  content: "";
+  position: absolute;
+  left: 1.05rem;
+  top: -0.7rem;
+  bottom: 1.4rem;
+  border-left: 2px solid var(--md-border);
+  border-bottom: 2px solid var(--md-border);
+  border-bottom-left-radius: 1rem;
+  pointer-events: none;
+}
+
+.alumni-comment-children > .alumni-comment-thread {
+  margin-left: 0 !important;
+  padding-top: 0.35rem;
+}
+
+.alumni-comment-children > .alumni-comment-thread::before {
+  content: "";
+  position: absolute;
+  left: -1.65rem;
+  top: 1.55rem;
+  width: 1.5rem;
+  border-top: 2px solid var(--md-border);
+  pointer-events: none;
+}
+
+.alumni-comment-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0.75rem 0;
+  font-size: 0.7rem;
+  color: var(--md-text-secondary);
+}
+
+.alumni-comment-reaction {
+  position: absolute;
+  right: -0.25rem;
+  bottom: -0.45rem;
+  z-index: 5;
+}
+
+.alumni-comment-reaction > button {
+  display: inline-flex;
+  min-width: 1.8rem;
+  height: 1.55rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  border: 1px solid var(--md-border);
+  border-radius: 999px;
+  background: var(--md-card);
+  color: var(--md-text-secondary);
+  box-shadow: 0 2px 7px rgb(15 23 42 / 15%);
+}
+
+.alumni-comment-reaction > button.selected {
+  color: var(--md-primary);
+}
+
+.alumni-comment-reaction > button small {
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.alumni-comment-reaction-picker {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.35rem);
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  border: 1px solid var(--md-border);
+  border-radius: 999px;
+  background: var(--md-card);
+  padding: 0.35rem 0.5rem;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 20%);
+  white-space: nowrap;
+}
+
+.alumni-comment-reaction-picker button {
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 1.2rem;
+}
+
+.alumni-comment-preview {
+  position: relative;
+  margin-top: 0.55rem;
+  width: fit-content;
+}
+
+.alumni-comment-preview img {
+  width: 5.5rem;
+  height: 5.5rem;
+  border: 1px solid var(--md-border);
+  border-radius: 0.8rem;
+  object-fit: cover;
+}
+
+.alumni-comment-preview button {
+  position: absolute;
+  right: -0.4rem;
+  top: -0.4rem;
+  display: grid;
+  width: 1.4rem;
+  height: 1.4rem;
+  place-items: center;
+  border-radius: 999px;
+  background: #dc2626;
+  color: white;
+  font-weight: 900;
+}
+.alumni-reshared-post {
+  overflow: hidden;
+  margin: 0.65rem 0 1rem;
+  border: 1px solid var(--md-border);
+  border-radius: 0.7rem;
+  background: var(--md-card);
+  background-clip: padding-box;
+}
+
+.alumni-reshared-details {
+  border-top: 1px solid var(--md-border);
+  background: var(--md-card);
+}
+
+.alumni-reshared-details > header {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.7rem 0.8rem 0.25rem;
+}
+
+.alumni-reshared-details > header > div {
+  min-width: 0;
+}
+
+.alumni-reshared-details > header a,
+.alumni-reshared-details > header b {
+  display: block;
+  overflow: hidden;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alumni-reshared-details > header small {
+  display: block;
+  color: var(--md-text-secondary);
+  font-size: 0.65rem;
+}
+
+.alumni-reshared-details > p {
+  padding: 0.25rem 0.8rem 0.75rem;
+  white-space: pre-wrap;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.alumni-reshared-media {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+  min-height: 12rem;
+  background: var(--md-border);
+}
+
+.alumni-reshared-media.multiple {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.alumni-reshared-media img,
+.alumni-reshared-media video {
+  display: block;
+  height: 100%;
+  max-height: 34rem;
+  min-height: 12rem;
+  width: 100%;
+  background: #111;
+  object-fit: contain;
+}
+
+.alumni-reshared-media.multiple img,
+.alumni-reshared-media.multiple video {
+  object-fit: cover;
+}
+
+.alumni-reshared-media a {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-top: 1px solid var(--md-border);
+}
+.alumni-create-post-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid var(--md-border);
+  border-radius: 1rem;
+  background: var(--md-card);
+  padding: 0.85rem 1rem;
+  box-shadow: 0 1px 4px rgb(15 23 42 / 10%);
+}
+
+.alumni-create-post-prompt {
+  min-width: 0;
+  flex: 1;
+  border-radius: 999px;
+  background: var(--md-hover);
+  padding: 0.8rem 1rem;
+  text-align: left;
+  font-size: 1rem;
+  color: var(--md-text-secondary);
+  transition: filter 150ms ease;
+}
+
+.alumni-create-post-prompt:hover {
+  filter: brightness(0.97);
+}
+
+.alumni-create-post-quick {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.5rem;
+  transition: transform 150ms ease, background 150ms ease;
+}
+
+.alumni-create-post-quick:hover {
+  transform: scale(1.08);
+  background: var(--md-hover);
+}
+
+.alumni-create-post-quick.video {
+  color: #f02849;
+}
+
+.alumni-create-post-quick.photo {
+  color: #45bd62;
+}
+
+.alumni-create-post-quick.feeling {
+  color: #f7b928;
+}
+
+.alumni-create-post-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(255 255 255 / 78%);
+  backdrop-filter: blur(2px);
+}
+
+.dark .alumni-create-post-backdrop {
+  background: rgb(2 6 23 / 78%);
+}
+
+.alumni-create-post-modal {
+  overflow: hidden;
+  width: min(39rem, 100%);
+  max-height: min(90vh, 52rem);
+  border: 1px solid var(--md-border);
+  border-radius: 1rem;
+  background: var(--md-card);
+  box-shadow: 0 18px 55px rgb(15 23 42 / 30%);
+}
+
+.alumni-create-post-modal-header {
+  position: relative;
+  display: grid;
+  min-height: 4.5rem;
+  place-items: center;
+  border-bottom: 1px solid var(--md-border);
+  padding: 1rem 4.5rem;
+}
+
+.alumni-create-post-modal-header h2 {
+  font-size: 1.45rem;
+  font-weight: 900;
+}
+
+.alumni-create-post-modal-header button {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  translate: 0 -50%;
+  border-radius: 999px;
+  background: var(--md-hover);
+  color: var(--md-text-secondary);
+}
+
+.alumni-create-post-modal-body {
+  overflow-y: auto;
+  max-height: calc(min(90vh, 52rem) - 4.5rem);
+  padding: 1.25rem;
+}
+
+.alumni-create-post-textarea {
+  display: block;
+  width: 100%;
+  min-height: 8.5rem;
+  margin-top: 1rem;
+  resize: vertical;
+  border: 0;
+  border-radius: 0.75rem;
+  background: transparent;
+  padding: 0.25rem 0;
+  color: var(--md-text-primary);
+  font-size: clamp(1.35rem, 3vw, 1.8rem);
+  line-height: 1.35;
+  outline: none;
+}
+
+.alumni-create-post-textarea::placeholder {
+  color: var(--md-text-secondary);
+}
+
+.alumni-create-post-submit {
+  margin-top: 1rem;
+}
+
+.alumni-create-post-tools {
+  margin-top: 1rem;
+  border: 1px solid var(--md-border);
+  border-radius: 0.85rem;
+  padding: 0.9rem 1rem;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 8%);
+}
+
+.alumni-create-post-tools > b {
+  font-size: 0.95rem;
+}
+
+.alumni-create-post-submit button {
+  width: 100%;
+  border-radius: 0.55rem;
+  background: var(--md-primary);
+  padding: 0.75rem 1rem;
+  color: white;
+  font-weight: 900;
+}
+
+.alumni-create-post-submit button:disabled {
+  cursor: not-allowed;
+  background: var(--md-hover);
+  color: var(--md-text-secondary);
+  opacity: 0.75;
+}
+
+@media (max-width: 560px) {
+  .alumni-create-post-trigger {
+    gap: 0.45rem;
+    padding: 0.7rem;
+  }
+
+  .alumni-create-post-prompt {
+    padding: 0.7rem 0.8rem;
+    font-size: 0.875rem;
+  }
+
+  .alumni-create-post-quick {
+    width: 1.65rem;
+  }
+
+  .alumni-create-post-modal-body {
+    padding: 1rem;
+  }
+}
+.alumni-facebook-post-card {
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+  border: 1px solid var(--md-border);
+  border-radius: 0.75rem;
+  background: var(--md-card);
+  background-clip: padding-box;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 12%);
+}
+
+.alumni-facebook-post-card > .p-5 {
+  border-radius: calc(0.75rem - 1px) calc(0.75rem - 1px) 0 0;
+  background: var(--md-card);
+  padding: 0.9rem 1rem 0.65rem;
+}
+
+.alumni-facebook-post-card > .grid {
+  background: #333;
+}
+
+.alumni-facebook-post-card > .grid img {
+  display: block;
+  width: 100%;
+  max-height: 42rem;
+  object-fit: contain;
+}
+
+.alumni-post-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.alumni-post-header-actions > button {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--md-text-secondary);
+}
+
+.alumni-post-header-actions > button:hover {
+  background: var(--md-hover);
+}
+
+.alumni-post-header-actions > .alumni-post-delete-button {
+  border: 0;
+  background: transparent;
+  color: #dc2626;
+  padding: 0;
+  box-shadow: none;
+}
+
+.alumni-post-header-actions > .alumni-post-delete-button:hover {
+  background: #fee2e2;
+  color: #b91c1c;
+  transform: none;
+}
+
+.alumni-post-header-actions > .alumni-post-delete-button:focus-visible {
+  outline: 2px solid #ef4444;
+  outline-offset: 2px;
+}
+
+.material-portal-dark .alumni-post-header-actions > .alumni-post-delete-button:hover {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+}
+
+.alumni-post-engagement-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 2.2rem;
+  margin: 0 1rem;
+  color: var(--md-text-secondary);
+  font-size: 0.75rem;
+}
+
+.alumni-post-primary-actions {
+  display: flex;
+  align-items: stretch;
+  margin: 0 1rem;
+  border-top: 1px solid var(--md-border);
+  border-bottom: 1px solid var(--md-border);
+  padding: 0.2rem 0;
+}
+
+.alumni-post-primary-actions > * {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.alumni-post-primary-actions > button,
+.alumni-post-primary-actions > div > button {
+  width: 100%;
+  min-width: 0;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--md-text-secondary);
+}
+
+.alumni-post-primary-actions > button:hover,
+.alumni-post-primary-actions > div > button:hover {
+  background: var(--md-hover);
+}
+
+@media (max-width: 520px) {
+  .alumni-post-primary-actions .portal-btn {
+    padding-inline: 0.45rem;
+    font-size: 0.75rem;
+  }
+
+  .alumni-post-engagement-summary {
+    font-size: 0.68rem;
+  }
 }

@@ -410,31 +410,11 @@ function classifyStartupError(error) {
   if (error?.name === "ValidationError") return "Mongoose schema validation error";
   if (error?.code === 11000) return "MongoDB duplicate key error";
   if (error?.code === "EADDRINUSE") return "HTTP port conflict";
-  if (/missing required env vars|JWT_SECRET|MONGO_URI|MONGODB_URI|PORT/i.test(error?.message || "")) {
+  if (/missing required env vars|JWT_SECRET|MONGODB_URI|PORT/i.test(error?.message || "")) {
     return "Environment variable misconfiguration";
   }
   if (error instanceof TypeError || error instanceof ReferenceError) return "Undefined variable / null reference error";
   return "Async startup failure";
-}
-
-function installProcessSafetyHandlers() {
-  process.on("uncaughtException", (error) => {
-    logger.error("Uncaught exception before graceful shutdown", {
-      category: classifyStartupError(error),
-      error: error.message,
-      stack: error.stack
-    });
-    process.exit(1);
-  });
-
-  process.on("unhandledRejection", (reason) => {
-    const error = reason instanceof Error ? reason : new Error(String(reason));
-    logger.error("Unhandled promise rejection", {
-      category: classifyStartupError(error),
-      error: error.message,
-      stack: error.stack
-    });
-  });
 }
 
 async function startServer() {
@@ -506,5 +486,4 @@ async function startServer() {
   }
 }
 
-installProcessSafetyHandlers();
 startServer();

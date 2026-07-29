@@ -4,6 +4,7 @@ import Student from "../models/Student.js";
 import User from "../models/User.js";
 import { getConfig } from "../lib/config.js";
 import { buildRoleProfile, studentProfileFromPayload } from "../services/userProfileService.js";
+import { canonicalDepartmentName } from "../services/departmentService.js";
 
 const signToken = (profile) => {
   // Read config lazily at call time (not at import time) to ensure dotenv has loaded
@@ -22,6 +23,12 @@ const minimumPasswordLength = 8;
 
 const normalizedEmail = (value) => String(value || "").trim().toLowerCase();
 const normalizedStudentId = (value) => String(value || "").trim();
+const registrationStudyYears = new Set([
+  "First year Full Time",
+  "Second year Full Time",
+  "First year Part Time",
+  "Second year Part Time"
+]);
 
 export async function register(req, res, next) {
   let createdStudent = null;
@@ -46,10 +53,15 @@ export async function register(req, res, next) {
     } = req.body;
     const emailAddress = normalizedEmail(email);
     const studentIdentifier = normalizedStudentId(studentId);
+    const normalizedAcademicYear = String(academicYear || "").trim();
+    const normalizedAcademicStage = String(academicStage || "").trim();
     const role = "student";
 
-    if (!name || !emailAddress || !password || !studentIdentifier || !nic || !department) {
-      return res.status(400).json({ message: "Name, email, password, Student ID, NIC, and department are required." });
+    if (!name || !emailAddress || !password || !studentIdentifier || !nic || !department || !normalizedAcademicYear || !normalizedAcademicStage) {
+      return res.status(400).json({ message: "Name, email, password, Student ID, NIC, department, academic year, and current study year are required." });
+    }
+    if (!registrationStudyYears.has(normalizedAcademicStage)) {
+      return res.status(400).json({ message: "Select a valid study year." });
     }
     if (String(password).length < minimumPasswordLength) {
       return res.status(400).json({ message: `Password must be at least ${minimumPasswordLength} characters.` });
@@ -58,6 +70,7 @@ export async function register(req, res, next) {
       return res.status(400).json({ message: "Password and confirm password do not match." });
     }
 
+    const canonicalDepartment = await canonicalDepartmentName(department);
     const existingUser = await User.findOne({
       $or: [{ email: emailAddress }, ...(studentIdentifier ? [{ "studentProfile.studentId": studentIdentifier }] : [])]
     }).select("_id");
@@ -69,17 +82,16 @@ export async function register(req, res, next) {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const normalizedAcademicStage = academicStage || "";
     const normalizedStudyMode = normalizedAcademicStage
       ? normalizedAcademicStage.includes("Part Time") ? "Part-time" : "Full-time"
       : studyMode;
     const studentProfile = studentProfileFromPayload({
       studentId: studentIdentifier,
       nic,
-      department,
-      program,
+      department: canonicalDepartment,
+      program: program || canonicalDepartment,
       intake,
-      academicYear,
+      academicYear: normalizedAcademicYear,
       academicStage: normalizedAcademicStage,
       studyMode: normalizedStudyMode,
       phone,
@@ -93,10 +105,10 @@ export async function register(req, res, next) {
       phone,
       nic,
       studentId: studentIdentifier,
-      department,
-      program,
+      department: canonicalDepartment,
+      program: program || canonicalDepartment,
       intake,
-      academicYear,
+      academicYear: normalizedAcademicYear,
       academicStage: normalizedAcademicStage,
       studyMode: normalizedStudyMode,
       guardianName,
@@ -125,7 +137,11 @@ export async function login(req, res, next) {
     }
 
     const user = await User.findOne({
-      $or: [{ email: normalizedEmail(identifier) }, { "studentProfile.studentId": normalizedStudentId(identifier) }]
+      $or: [
+        { email: normalizedEmail(identifier) },
+        { "studentProfile.studentId": normalizedStudentId(identifier) },
+        { "alumniProfile.studentRegistrationNumber": normalizedStudentId(identifier) }
+      ]
     });
     if (!user) return res.status(401).json({ message: "Invalid credentials" });
 

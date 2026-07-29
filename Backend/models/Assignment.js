@@ -95,6 +95,7 @@ const assignmentSchema = new mongoose.Schema(
     totalMarks: { type: Number, default: 100, min: 0 },
     status: { type: String, enum: ["draft", "published", "closed"], default: "published" },
     publishAt: { type: Date },
+    dueDate: { type: Date },
     notifyByEmail: { type: Boolean, default: false },
     attachmentUrl: { type: String, trim: true },
     attachments: { type: [attachmentSchema], default: [] },

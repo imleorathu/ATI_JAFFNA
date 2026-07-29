@@ -1,9 +1,10 @@
 import logger from "./logger.js";
 
 const REQUIRED_VARS = ["JWT_SECRET"];
+const DATABASE_NAME = "ATI_Jaffna";
 const OPTIONAL_VARS = {
   PORT: "5000",
-  MONGODB_URI: "mongodb://127.0.0.1:27017/ATI_JAFFNA",
+  MONGODB_URI: "mongodb://127.0.0.1:27017/ATI_Jaffna",
   CLIENT_URL: "http://127.0.0.1:5173",
   NODE_ENV: "development",
   LOG_LEVEL: undefined,
@@ -29,7 +30,7 @@ const OPTIONAL_VARS = {
 
 function validateEnv() {
   const missing = REQUIRED_VARS.filter((key) => !process.env[key]);
-  const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI || OPTIONAL_VARS.MONGODB_URI;
+  const mongoUri = process.env.MONGODB_URI || OPTIONAL_VARS.MONGODB_URI;
   const port = Number(process.env.PORT || OPTIONAL_VARS.PORT);
 
   if (missing.length) {
@@ -38,13 +39,17 @@ function validateEnv() {
   }
 
   if (!mongoUri) {
-    throw new Error("MONGO_URI or MONGODB_URI is required.");
+    throw new Error("MONGODB_URI is required.");
   }
 
   try {
-    new URL(mongoUri);
+    const parsedMongoUri = new URL(mongoUri);
+    const configuredDatabase = decodeURIComponent(parsedMongoUri.pathname.replace(/^\//, ""));
+    if (configuredDatabase !== DATABASE_NAME) {
+      throw new Error(`MONGODB_URI must use the ${DATABASE_NAME} database.`);
+    }
   } catch {
-    throw new Error("MONGO_URI/MONGODB_URI must be a valid MongoDB connection string.");
+    throw new Error(`MONGODB_URI must be a valid MongoDB connection string for ${DATABASE_NAME}.`);
   }
 
   if (!Number.isInteger(port) || port <= 0 || port > 65535) {
@@ -62,7 +67,7 @@ function validateEnv() {
 function getConfig() {
   const config = {
     port: parseInt(process.env.PORT || OPTIONAL_VARS.PORT, 10),
-    mongoUri: process.env.MONGO_URI || process.env.MONGODB_URI || OPTIONAL_VARS.MONGODB_URI,
+    mongoUri: process.env.MONGODB_URI || OPTIONAL_VARS.MONGODB_URI,
     clientUrl: process.env.CLIENT_URL || OPTIONAL_VARS.CLIENT_URL,
     nodeEnv: process.env.NODE_ENV || OPTIONAL_VARS.NODE_ENV,
     logLevel: process.env.LOG_LEVEL || OPTIONAL_VARS.LOG_LEVEL,

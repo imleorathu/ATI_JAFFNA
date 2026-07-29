@@ -29,17 +29,17 @@ const emptyDraft = {
 };
 
 const statusStyles = {
-  new: "bg-sky-500/15 text-sky-300",
+  new: "bg-sky-500/15 text-[color:var(--message-sky-text)]",
   read: "bg-[color:var(--md-hover)] text-[color:var(--md-text-secondary)]",
-  resolved: "bg-emerald-500/15 text-emerald-300",
-  archived: "bg-slate-500/15 text-slate-300"
+  resolved: "bg-emerald-500/15 text-[color:var(--message-green-text)]",
+  archived: "bg-slate-500/15 text-[color:var(--md-text-secondary)]"
 };
 
 const priorityStyles = {
   low: "bg-[color:var(--md-hover)] text-[color:var(--md-text-secondary)]",
-  normal: "bg-blue-500/15 text-blue-300",
-  high: "bg-amber-500/15 text-amber-300",
-  urgent: "bg-red-500/15 text-red-300"
+  normal: "bg-blue-500/15 text-[color:var(--message-blue-text)]",
+  high: "bg-amber-500/15 text-[color:var(--message-amber-text)]",
+  urgent: "bg-red-500/15 text-[color:var(--message-red-text)]"
 };
 
 const audienceLabels = {
@@ -48,8 +48,8 @@ const audienceLabels = {
 };
 
 const audienceStyles = {
-  admin: "bg-violet-500/15 text-violet-200",
-  department: "bg-teal-500/15 text-teal-200"
+  admin: "bg-violet-500/15 text-[color:var(--message-violet-text)]",
+  department: "bg-teal-500/15 text-[color:var(--message-teal-text)]"
 };
 
 const departmentInboxRoles = ["lecturer", "department_staff"];
@@ -256,7 +256,7 @@ function StaffMessagesPage({ role }) {
     : "Manage messages sent directly to admin and public contact inquiries.";
 
   return (
-    <section className="space-y-6">
+    <section className="messages-page space-y-6">
       <div className="flex flex-col gap-4 pb-5 sm:flex-row sm:items-end sm:justify-between" style={{borderBottom:"1px solid var(--md-border)"}}>
         <div>
           <p className="portal-page-label">Communication</p>
@@ -281,9 +281,9 @@ function StaffMessagesPage({ role }) {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
           ["Total", stats.total, MessageSquare, "text-[color:var(--md-text-primary)]"],
-          ["New", stats.new, Mail, "text-sky-300"],
-          ["Urgent", stats.urgent, Star, "text-red-300"],
-          ["Resolved", stats.resolved, CheckCircle2, "text-emerald-300"]
+          ["New", stats.new, Mail, "text-[color:var(--message-sky-text)]"],
+          ["Urgent", stats.urgent, Star, "text-[color:var(--message-red-text)]"],
+          ["Resolved", stats.resolved, CheckCircle2, "text-[color:var(--message-green-text)]"]
         ].map(([label, value, Icon, color]) => (
           <GlassCard key={label} dark className="p-5">
             <div className="flex items-center justify-between">
@@ -299,13 +299,13 @@ function StaffMessagesPage({ role }) {
 
       <GlassCard className="p-4">
         <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
-          <label className="flex items-center gap-2 rounded-lg border border-[color:var(--md-border)] bg-slate-950 px-3 py-2.5">
+          <label className="flex items-center gap-2 rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] px-3 py-2.5">
             <Search size={16} className="text-[color:var(--md-text-secondary)]" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search by name, email, subject, message, status..."
-              className="" style={{width:"100%"}}
+              className="bg-transparent text-[color:var(--md-text-primary)] outline-none placeholder:text-[color:var(--md-text-secondary)]" style={{width:"100%"}}
             />
           </label>
           <div className="flex flex-wrap gap-2">
@@ -330,7 +330,7 @@ function StaffMessagesPage({ role }) {
 
         {selectedIds.length > 0 && (
           <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-sky-400/20 bg-sky-500/10 p-3">
-            <span className="mr-2 text-sm font-bold text-sky-100">{selectedIds.length} selected</span>
+            <span className="mr-2 text-sm font-bold text-[color:var(--message-sky-text)]">{selectedIds.length} selected</span>
             <BulkButton onClick={() => runBulkUpdate({ status: "read" })} icon={Mail} label="Mark read" />
             <BulkButton onClick={() => runBulkUpdate({ status: "resolved" })} icon={CheckCircle2} label="Resolve" />
             <BulkButton onClick={() => runBulkUpdate({ status: "archived" })} icon={Archive} label="Archive" />
@@ -380,7 +380,7 @@ function StaffMessagesPage({ role }) {
                       onChange={() => toggleSelected(message._id)}
                       className="mt-1 h-4 w-4 shrink-0 accent-sky-400"
                     />
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sky-400/10 text-sm font-black text-sky-200">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sky-400/10 text-sm font-black text-[color:var(--message-sky-text)]">
                       {message.name?.slice(0, 2).toUpperCase() || "MS"}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -398,7 +398,7 @@ function StaffMessagesPage({ role }) {
                         <Badge className={priorityStyles[message.priority] || priorityStyles.normal}>{message.priority || "normal"}</Badge>
                         <Badge className="bg-[color:var(--md-hover)] text-[color:var(--md-text-secondary)]">{message.category || "general"}</Badge>
                         <Badge className={audienceStyles[message.audience] || audienceStyles.admin}>{audienceLabels[message.audience] || "Admin"}</Badge>
-                        {message.department && <Badge className="bg-sky-500/10 text-sky-200">{message.department}</Badge>}
+                        {message.department && <Badge className="bg-sky-500/10 text-[color:var(--message-sky-text)]">{message.department}</Badge>}
                       </div>
                     </div>
                   </button>
@@ -420,7 +420,7 @@ function StaffMessagesPage({ role }) {
             <div className="space-y-5">
               <div className="flex flex-col gap-3 pb-5 sm:flex-row sm:items-start sm:justify-between" style={{borderBottom:"1px solid var(--md-border)"}}>
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-sky-300">Selected Message</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--message-sky-text)]">Selected Message</p>
                   <h2 className="mt-2 text-xl font-black text-[color:var(--md-text-primary)]">{selectedMessage.subject}</h2>
                   <p className="portal-page-subtitle">{formatDate(selectedMessage.createdAt)}</p>
                 </div>
@@ -442,7 +442,7 @@ function StaffMessagesPage({ role }) {
                 <Info label="Replied" value={selectedMessage.repliedAt ? formatDate(selectedMessage.repliedAt) : "Not yet"} />
               </div>
 
-              <div className="rounded-lg border border-[color:var(--md-border)] bg-slate-950/60 p-4">
+              <div className="rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-hover)] p-4">
                 <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-[color:var(--md-text-secondary)]">Message</p>
                 <p className="whitespace-pre-wrap text-sm leading-6 text-[color:var(--md-text-secondary)]">{selectedMessage.message}</p>
               </div>
@@ -610,7 +610,7 @@ function StudentMessageCenter({ user }) {
   ];
 
   return (
-    <section className="space-y-6">
+    <section className="messages-page space-y-6">
       <div className="flex flex-col gap-4 pb-5 sm:flex-row sm:items-end sm:justify-between" style={{borderBottom:"1px solid var(--md-border)"}}>
         <div>
           <p className="portal-page-label">Student Messages</p>
@@ -631,8 +631,8 @@ function StudentMessageCenter({ user }) {
       <div className="grid gap-4 sm:grid-cols-3">
         {[
           ["Total Messages", stats.total, MessageSquare, "text-[color:var(--md-text-primary)]"],
-          ["Department", stats.department, Building2, "text-teal-300"],
-          ["Admin", stats.admin, ShieldCheck, "text-violet-300"]
+          ["Department", stats.department, Building2, "text-[color:var(--message-teal-text)]"],
+          ["Admin", stats.admin, ShieldCheck, "text-[color:var(--message-violet-text)]"]
         ].map(([label, value, Icon, color]) => (
           <GlassCard key={label} dark className="p-5">
             <div className="flex items-center justify-between">
@@ -748,7 +748,7 @@ function FilterSelect({ value, onChange, options }) {
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="rounded-lg border border-[color:var(--md-border)] bg-slate-950 px-3 py-2 text-sm font-bold capitalize text-[color:var(--md-text-primary)] outline-none focus:border-sky-400"
+      className="rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] px-3 py-2 text-sm font-bold capitalize text-[color:var(--md-text-primary)] outline-none focus:border-sky-400"
     >
       {options.map((option) => (
         <option key={option} value={option}>
@@ -767,7 +767,7 @@ function DetailSelect({ label, value, options, onChange, disabled }) {
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 w-full rounded-lg border border-[color:var(--md-border)] bg-slate-950 px-3 py-2.5 text-sm font-bold capitalize text-[color:var(--md-text-primary)] outline-none focus:border-sky-400 disabled:opacity-60"
+        className="mt-2 w-full rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] px-3 py-2.5 text-sm font-bold capitalize text-[color:var(--md-text-primary)] outline-none focus:border-sky-400 disabled:opacity-60"
       >
         {options.map((option) => (
           <option key={option} value={option}>
@@ -785,7 +785,7 @@ function IconButton({ title, onClick, icon: Icon, danger = false }) {
       type="button"
       title={title}
       onClick={onClick}
-      className={`rounded-lg p-2 transition ${danger ? "bg-red-500/10 text-red-300 hover:bg-red-500/20" : "bg-[color:var(--md-hover)] text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)] hover:text-[color:var(--md-text-primary)]"}`}
+      className={`rounded-lg p-2 transition ${danger ? "bg-red-500/10 text-[color:var(--message-red-text)] hover:bg-red-500/20" : "bg-[color:var(--md-hover)] text-[color:var(--md-text-secondary)] hover:bg-[color:var(--md-hover)] hover:text-[color:var(--md-text-primary)]"}`}
     >
       <Icon size={17} />
     </button>

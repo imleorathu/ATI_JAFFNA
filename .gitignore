@@ -2,6 +2,7 @@ node_modules/
 .mongodb-data/
 .mongodb-log/
 uploads/
+Backend/private-uploads/
 .env
 secrets/
 Backend/secrets/

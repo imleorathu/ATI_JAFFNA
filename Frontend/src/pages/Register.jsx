@@ -37,7 +37,7 @@ const hndProgrammes = [
 ];
 
 const modeOptions = ["Full-time", "Part-time"];
-const hnditAcademicStages = [
+const studyYearOptions = [
   "First year Full Time",
   "Second year Full Time",
   "First year Part Time",
@@ -53,6 +53,7 @@ const initialForm = {
   nic: "",
   department: "",
   program: "",
+  academicYear: "",
   academicStage: "",
   studyMode: "Full-time",
   phone: "",
@@ -120,7 +121,7 @@ export default function Register() {
       if (field === "studyMode") {
         const incompatibleStage = value === "Full-time" ? "Part Time" : "Full Time";
         if (next.academicStage.includes(incompatibleStage)) {
-          next.academicStage = hnditAcademicStages.find((stage) => stage.includes(value === "Full-time" ? "Full Time" : "Part Time")) || "";
+          next.academicStage = studyYearOptions.find((stage) => stage.includes(value === "Full-time" ? "Full Time" : "Part Time")) || "";
         }
       }
       if (field === "academicStage") {
@@ -273,15 +274,26 @@ export default function Register() {
                   </select>
                 </FieldShell></motion.div>
 
-                <motion.div variants={fieldEntrance} className="register-field-wide"><FieldShell label="Current Study year" icon={BookOpen}>
+                <motion.div variants={fieldEntrance}><FieldShell label="Academic year" icon={GraduationCap}>
+                  <input
+                    type="text"
+                    value={form.academicYear}
+                    onChange={(event) => setField("academicYear", event.target.value)}
+                    required
+                    placeholder="2025/2026"
+                    className={controlClass}
+                  />
+                </FieldShell></motion.div>
+
+                <motion.div variants={fieldEntrance}><FieldShell label="Current study year" icon={BookOpen}>
                   <select
                     value={form.academicStage}
                     onChange={(event) => setField("academicStage", event.target.value)}
                     required
                     className={controlClass}
                   >
-                    <option value="">Select current study year</option>
-                    {hnditAcademicStages.map((stage) => (
+                    <option value="">Select study year</option>
+                    {studyYearOptions.map((stage) => (
                       <option key={stage} value={stage}>
                         {stage}
                       </option>

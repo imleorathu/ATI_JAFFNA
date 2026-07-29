@@ -4,7 +4,7 @@ import GlassCard from "../../components/GlassCard";
 import { apiFetch, downloadCsv } from "../../lib/api";
 import { useModal } from "../../contexts/ModalContext.jsx";
 
-const roles = ["student", "lecturer", "department_staff", "finance_officer", "admin"];
+const roles = ["student", "alumni", "lecturer", "department_staff", "finance_officer", "admin"];
 const statuses = ["pending", "approved", "rejected"];
 
 const statusStyles = {
@@ -15,6 +15,7 @@ const statusStyles = {
 
 const roleLabels = {
   student: "Student",
+  alumni: "Alumni",
   lecturer: "Lecturer",
   department_staff: "Department Staff",
   finance_officer: "Finance Officer",
@@ -32,7 +33,7 @@ const fallbackDepartments = [
 ];
 
 function userDepartment(user) {
-  return user.studentProfile?.department || user.studentProfile?.program || user.staffProfile?.department || user.facultyProfile?.department || user.adminProfile?.department || "";
+  return user.studentProfile?.department || user.studentProfile?.program || user.alumniProfile?.department || user.staffProfile?.department || user.facultyProfile?.department || user.adminProfile?.department || "";
 }
 
 export default function UserManagement() {
@@ -146,6 +147,15 @@ export default function UserManagement() {
       return {
         staffProfile: {
           ...(user.staffProfile || user.facultyProfile || {}),
+          department
+        }
+      };
+    }
+
+    if (user.role === "alumni") {
+      return {
+        alumniProfile: {
+          ...(user.alumniProfile || {}),
           department
         }
       };
@@ -311,11 +321,11 @@ export default function UserManagement() {
                       <td className="py-3 pr-4">
                         <select
                           value={user.role || "student"}
-                          disabled={savingId === user._id}
+                          disabled={savingId === user._id || user.role === "alumni"}
                           onChange={(event) => updateUser(user, { role: event.target.value })}
                           className="rounded-lg border border-[color:var(--md-border)] bg-[color:var(--md-card)] px-3 py-2 text-sm font-bold text-[color:var(--md-text-primary)] outline-none focus:border-sky-400"
                         >
-                          {roles.map((role) => (
+                          {roles.filter((role) => role !== "alumni" || user.role === "alumni").map((role) => (
                             <option key={role} value={role}>{roleLabels[role]}</option>
                           ))}
                         </select>

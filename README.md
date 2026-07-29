@@ -2,6 +2,16 @@
 
 Full-stack ATI JAFFNA website scaffold built with React, Vite, Tailwind CSS, Node.js, Express, and MongoDB.
 
+## Start the application
+
+From the project root, start the frontend and backend together:
+
+```bash
+npm start
+```
+
+The frontend runs on `http://127.0.0.1:5173` and the API runs on `http://localhost:5000`.
+
 ## Structure
 
 ```txt

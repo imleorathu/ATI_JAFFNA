@@ -9,6 +9,7 @@ import { useLanguage } from "../contexts/LanguageContext.jsx";
 const portalPathForRole = (role) => {
   const normalized = String(role || "student").toLowerCase();
   if (normalized === "admin") return "/admin";
+  if (normalized === "alumni") return "/alumni";
   if (normalized === "finance_officer" || normalized === "finance") return "/finance";
   if (normalized === "department_staff") return "/faculty";
   if (normalized === "faculty" || normalized === "lecturer" || normalized === "staff") return "/faculty";
@@ -92,7 +93,7 @@ export default function Login() {
 
           <div className="login-security-note">
             <ShieldCheck size={19} />
-            <span>Secure access for ATI Jaffna students and staff.</span>
+            <span>Secure access for ATI Jaffna students, alumni, and staff.</span>
           </div>
         </motion.aside>
 
@@ -106,7 +107,7 @@ export default function Login() {
           <motion.form onSubmit={handleSubmit} className="login-form" variants={formEntrance}>
             <motion.div variants={fieldEntrance}>
               <label className="login-field">
-                <span>Email or Student ID</span>
+                <span>Email, Student ID, or Alumni Registration Number</span>
                 <div className="login-input-wrap">
                   <Mail size={18} />
                   <input
@@ -115,7 +116,7 @@ export default function Login() {
                     onChange={(event) => setIdentifier(event.target.value)}
                     required
                     autoComplete="username"
-                    placeholder="you@atijaffna.edu.lk or ATI Student ID"
+                    placeholder="Email or ATI registration number"
                   />
                 </div>
               </label>
@@ -169,6 +170,10 @@ export default function Login() {
               <Link to="/register">
                 {t("auth.createAccount")}
               </Link>
+            </motion.div>
+            <motion.div className="login-register-row" variants={fieldEntrance}>
+              <p>Are you an Alumni?</p>
+              <Link to="/alumni/register">Create an alumni account</Link>
             </motion.div>
           </motion.form>
         </motion.div>

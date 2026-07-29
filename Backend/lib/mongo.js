@@ -1,18 +1,21 @@
 import mongoose from "mongoose";
 import logger from "./logger.js";
 
-const MONGO_OPTIONS = {
-  maxPoolSize: parseInt(process.env.MONGO_MAX_POOL_SIZE || "10", 10),
-  minPoolSize: parseInt(process.env.MONGO_MIN_POOL_SIZE || "2", 10),
-  serverSelectionTimeoutMS: 5000,
-  socketTimeoutMS: 45000,
-  family: 4,
-  retryWrites: true,
-  retryReads: true
-};
+function getMongoOptions() {
+  return {
+    // Imports run before server.js loads .env, so resolve these at connection time.
+    maxPoolSize: parseInt(process.env.MONGO_MAX_POOL_SIZE || "10", 10),
+    minPoolSize: parseInt(process.env.MONGO_MIN_POOL_SIZE || "2", 10),
+    serverSelectionTimeoutMS: parseInt(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || "5000", 10),
+    socketTimeoutMS: parseInt(process.env.MONGO_SOCKET_TIMEOUT_MS || "45000", 10),
+    family: 4,
+    retryWrites: true,
+    retryReads: true
+  };
+}
 
 async function connectMongo(uri, options = {}) {
-  const opts = { ...MONGO_OPTIONS, ...options };
+  const opts = { ...getMongoOptions(), ...options };
 
   mongoose.connection.on("connected", () => logger.info("MongoDB connected", { db: mongoose.connection.name }));
   mongoose.connection.on("error", (err) => logger.error("MongoDB connection error", { error: err.message }));

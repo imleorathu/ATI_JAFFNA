@@ -405,7 +405,7 @@ function parseBuilderTheme(settings = {}) {
 }
 
 export default function FormsPage({ embedded = false, embeddedFormId = "", embeddedGradingSettings = null, onEmbeddedFormSaved }) {
-  const { confirm } = useModal();
+  const { confirm, requestText } = useModal();
   const [forms, setForms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1721,9 +1721,9 @@ function RichTextEditor({ value, onChange, accent, placeholder }) {
     saveSelection();
     sync();
   };
-  const addLink = () => {
+  const addLink = async () => {
     saveSelection();
-    const url = window.prompt("Enter link URL");
+    const url = await requestText({ title: "Add link", message: "Enter the URL to add to the selected text.", placeholder: "https://example.com", confirmLabel: "Add link" });
     if (!url) return;
     const normalizedUrl = /^(https?:|mailto:|tel:|#)/i.test(url.trim()) ? url.trim() : `https://${url.trim()}`;
     runCommand("createLink", normalizedUrl);

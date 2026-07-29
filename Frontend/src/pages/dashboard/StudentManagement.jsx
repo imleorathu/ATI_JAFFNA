@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Download, Edit3, Mail, Phone, Plus, Search, Trash2, UserRound, X } from "lucide-react";
+import { Award, CheckCircle2, Download, Edit3, Mail, Phone, Plus, Search, Trash2, UserRound, X } from "lucide-react";
 import GlassCard from "../../components/GlassCard";
 import AppModal from "../../components/AppModal.jsx";
 import { useAuth } from "../../contexts/AuthContext";
@@ -66,6 +66,7 @@ export default function StudentManagement() {
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [studyModeFilter, setStudyModeFilter] = useState("all");
   const [academicStageFilter, setAcademicStageFilter] = useState("all");
+  const [academicYearFilter, setAcademicYearFilter] = useState("all");
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -73,6 +74,13 @@ export default function StudentManagement() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const [graduationTarget, setGraduationTarget] = useState(null);
+  const [graduationBatch, setGraduationBatch] = useState("");
+  const [graduationYear, setGraduationYear] = useState(String(new Date().getFullYear()));
+  const [graduating, setGraduating] = useState(false);
+
+  const batchOptions = useMemo(() => Array.from(new Set(students.map((student) => student.intake).filter(Boolean))).sort(), [students]);
+  const academicYearOptions = useMemo(() => Array.from(new Set(students.map((student) => student.academicYear).filter(Boolean))).sort(), [students]);
 
   const loadDepartments = async () => {
     try {
@@ -132,6 +140,7 @@ export default function StudentManagement() {
       const matchesDepartment = isFaculty || departmentFilter === "all" || student.department === departmentFilter;
       const matchesStudyMode = studyModeFilter === "all" || student.studyMode === studyModeFilter;
       const matchesAcademicStage = academicStageFilter === "all" || student.academicStage === academicStageFilter;
+      const matchesAcademicYear = academicYearFilter === "all" || student.academicYear === academicYearFilter;
       const matchesSearch =
         !query ||
         [
@@ -153,9 +162,9 @@ export default function StudentManagement() {
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(query));
 
-      return matchesDepartment && matchesStudyMode && matchesAcademicStage && matchesSearch;
+      return matchesDepartment && matchesStudyMode && matchesAcademicStage && matchesAcademicYear && matchesSearch;
     });
-  }, [academicStageFilter, departmentFilter, isFaculty, search, students, studyModeFilter]);
+  }, [academicStageFilter, academicYearFilter, departmentFilter, isFaculty, search, students, studyModeFilter]);
 
   const stats = useMemo(
     () => ({
@@ -292,6 +301,21 @@ export default function StudentManagement() {
     }
   };
 
+  const graduate = async (event) => {
+    event.preventDefault();
+    if (!graduationTarget) return;
+    setGraduating(true); setError(""); setStatus("");
+    try {
+      const data = graduationTarget.type === "student"
+        ? await apiFetch(`/api/alumni/graduate/student/${graduationTarget.student._id}`, { method: "POST", body: JSON.stringify({ graduationYear }) })
+        : await apiFetch("/api/alumni/graduate/batch", { method: "POST", body: JSON.stringify({ batch: graduationBatch, graduationYear }) });
+      setStatus(data.message || "Graduation status updated successfully.");
+      setGraduationTarget(null); setGraduationBatch("");
+      await loadStudents();
+    } catch (err) { setError(err?.message || "Unable to graduate the selected student record(s)."); }
+    finally { setGraduating(false); }
+  };
+
   const exportStudents = () => {
     downloadCsv(
       "ati-students.csv",
@@ -347,6 +371,11 @@ export default function StudentManagement() {
             <Download size={16} />
             Export
           </button>
+          {!isFaculty && (
+            <button type="button" onClick={() => setGraduationTarget({ type: "batch" })} className="portal-btn" disabled={!batchOptions.length}>
+              <Award size={16} /> Graduate Batch
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
@@ -468,9 +497,10 @@ export default function StudentManagement() {
                 className="portal-input"
               />
               <input
+                required
                 value={form.academicYear}
                 onChange={(event) => setForm((current) => ({ ...current, academicYear: event.target.value }))}
-                placeholder="Academic year"
+                placeholder="Academic year (e.g. 2025/2026)"
                 className="portal-input"
               />
               <select
@@ -547,6 +577,20 @@ export default function StudentManagement() {
         </AppModal>
       )}
 
+      <AppModal open={!!graduationTarget} onClose={() => !graduating && setGraduationTarget(null)} size="sm">
+        <form onSubmit={graduate} className="space-y-4 p-6">
+          <div className="flex items-center gap-3"><Award className="text-[color:var(--md-primary)]"/><div><h2 className="classroom-section-title">{graduationTarget?.type === "batch" ? "Graduate a Batch" : "Graduate Student"}</h2><p className="portal-page-subtitle">This permanently moves the active student record and existing login to the Alumni portal.</p></div></div>
+          {graduationTarget?.type === "student" ? (
+            <div className="rounded-lg bg-[color:var(--md-hover)] p-4"><p className="font-bold">{graduationTarget.student.fullName}</p><p className="text-sm text-[color:var(--md-text-secondary)]">{graduationTarget.student.studentId} · {graduationTarget.student.intake || "No batch recorded"}</p></div>
+          ) : (
+            <label className="block text-sm font-bold">Batch<select required value={graduationBatch} onChange={(event) => setGraduationBatch(event.target.value)} className="portal-input mt-2 w-full"><option value="">Select batch</option>{batchOptions.map((batch) => <option key={batch} value={batch}>{batch}</option>)}</select></label>
+          )}
+          <label className="block text-sm font-bold">Graduation Year<input required value={graduationYear} onChange={(event) => setGraduationYear(event.target.value)} placeholder="2026" className="portal-input mt-2 w-full"/></label>
+          <div className="portal-alert-danger">After graduation, the selected student account(s) cannot access the Student portal. Their current email/registration number and password will open the Alumni portal instead.</div>
+          <div className="flex gap-3"><button type="button" onClick={() => setGraduationTarget(null)} className="portal-btn" disabled={graduating}>Cancel</button><button type="submit" className="portal-btn-primary" disabled={graduating}>{graduating ? "Moving to Alumni..." : "Confirm Graduation"}</button></div>
+        </form>
+      </AppModal>
+
       <GlassCard className="p-5">
         <div className="mb-4 flex flex-col gap-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -561,7 +605,7 @@ export default function StudentManagement() {
               />
             </label>
           </div>
-          <div className={`grid gap-3 ${isFaculty ? "md:grid-cols-2" : "md:grid-cols-[1fr_220px_260px]"}`}>
+          <div className={`grid gap-3 ${isFaculty ? "md:grid-cols-2" : "md:grid-cols-2 xl:grid-cols-4"}`}>
             {!isFaculty && (
               <select
                 value={departmentFilter}
@@ -572,6 +616,12 @@ export default function StudentManagement() {
               >
                 <option value="all">All departments</option>
                 {departments.map((department) => <option key={department} value={department}>{department}</option>)}
+              </select>
+            )}
+            {!isFaculty && (
+              <select value={academicYearFilter} onChange={(event) => setAcademicYearFilter(event.target.value)} className="portal-input">
+                <option value="all">All academic years</option>
+                {academicYearOptions.map((year) => <option key={year} value={year}>{year}</option>)}
               </select>
             )}
             <select value={studyModeFilter} onChange={(event) => setStudyModeFilter(event.target.value)} className="portal-input">
@@ -631,7 +681,7 @@ export default function StudentManagement() {
                     <td className="py-3 pr-4">
                       <p className="font-semibold text-[color:var(--md-text-secondary)]">{student.program || "No programme"}</p>
                       <p className="mt-1 text-xs text-[color:var(--md-text-secondary)]">
-                        {[student.department, student.academicStage, student.studyMode].filter(Boolean).join(" | ") || "No academic details"}
+                        {[student.department, student.academicYear && `Academic year: ${student.academicYear}`, student.academicStage, student.studyMode].filter(Boolean).join(" | ") || "No academic details"}
                       </p>
                     </td>
                     <td className="py-3 pr-4">
@@ -649,6 +699,7 @@ export default function StudentManagement() {
                         <button type="button" onClick={() => startEdit(student)} className="portal-btn" style={{padding:"0.4rem"}}>
                           <Edit3 size={16} />
                         </button>
+                        {!isFaculty && <button type="button" title="Mark as graduated" onClick={() => setGraduationTarget({ type: "student", student })} className="portal-btn" style={{padding:"0.4rem"}}><Award size={16}/></button>}
                         <button type="button" onClick={() => deleteStudent(student)} className="portal-btn-danger" style={{padding:"0.4rem"}}>
                           <Trash2 size={16} />
                         </button>

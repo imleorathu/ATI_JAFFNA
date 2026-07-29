@@ -12,7 +12,7 @@ const timetableEntrySchema = new mongoose.Schema(
     day: {
       type: String,
       required: true,
-      enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+      enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     },
     time: { type: String, required: true, trim: true },
     subject: { type: String, required: true, trim: true },

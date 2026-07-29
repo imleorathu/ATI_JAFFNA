@@ -9,20 +9,34 @@ function sanitizeStack(stack) {
 
 function formatError(error) {
   if (error.code === 11000) {
-    const field = Object.keys(error.keyPattern || error.keyValue || {})[0] || "field";
-    return { status: 409, message: `Another record already uses this ${field}.`, code: "DUPLICATE_ENTRY" };
+    const field =
+      Object.keys(error.keyPattern || error.keyValue || {})[0] || "field";
+    return {
+      status: 409,
+      message: `Another record already uses this ${field}.`,
+      code: "DUPLICATE_ENTRY",
+    };
   }
 
   if (error.name === "ValidationError" && error.errors) {
     const details = Object.values(error.errors).map((e) => ({
       field: e.path,
-      message: e.message
+      message: e.message,
     }));
-    return { status: 400, message: "Validation failed", details, code: "VALIDATION_ERROR" };
+    return {
+      status: 400,
+      message: "Validation failed",
+      details,
+      code: "VALIDATION_ERROR",
+    };
   }
 
   if (error.name === "CastError") {
-    return { status: 400, message: `Invalid ${error.kind} value for ${error.path}.`, code: "INVALID_VALUE" };
+    return {
+      status: 400,
+      message: `Invalid ${error.kind} value for ${error.path}.`,
+      code: "INVALID_VALUE",
+    };
   }
 
   if (error.name === "JsonWebTokenError") {
@@ -30,18 +44,30 @@ function formatError(error) {
   }
 
   if (error.name === "TokenExpiredError") {
-    return { status: 401, message: "Token has expired.", code: "TOKEN_EXPIRED" };
+    return {
+      status: 401,
+      message: "Token has expired.",
+      code: "TOKEN_EXPIRED",
+    };
   }
 
   if (error.name === "MulterError") {
-    return { status: 400, message: error.message, code: "UPLOAD_ERROR" };
+    const message =
+      error.code === "LIMIT_FILE_SIZE"
+        ? "The selected file is too large. Profile and cover photos must be 25 MB or smaller."
+        : error.message;
+    return { status: 400, message, code: "UPLOAD_ERROR" };
   }
 
   if (error.status) {
     return { status: error.status, message: error.message, code: error.code };
   }
 
-  return { status: 500, message: "An internal server error occurred.", code: "INTERNAL_ERROR" };
+  return {
+    status: 500,
+    message: "An internal server error occurred.",
+    code: "INTERNAL_ERROR",
+  };
 }
 
 export default function errorHandler(error, req, res, next) {
@@ -53,7 +79,7 @@ export default function errorHandler(error, req, res, next) {
       url: req.url,
       error: error.message,
       stack: error.stack,
-      body: req.body ? Object.keys(req.body) : undefined
+      body: req.body ? Object.keys(req.body) : undefined,
     });
   } else {
     logger.warn("Client error response", {
@@ -61,7 +87,7 @@ export default function errorHandler(error, req, res, next) {
       url: req.url,
       status,
       message,
-      code
+      code,
     });
   }
 

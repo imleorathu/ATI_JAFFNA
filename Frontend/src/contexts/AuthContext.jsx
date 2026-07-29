@@ -87,7 +87,7 @@ export function AuthProvider({ children }) {
       return data;
     } catch (error) {
       if (error instanceof TypeError) {
-        throw new Error("Cannot reach the API. Make sure the backend is running on http://localhost:5000.");
+        throw new Error(`Cannot reach the API. Make sure the backend is running on ${API_BASE}.`);
       }
 
       throw error;

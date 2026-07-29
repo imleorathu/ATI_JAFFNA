@@ -29,10 +29,11 @@ import { useModal } from "../../contexts/ModalContext.jsx";
 const resources = [
   { key: "users", path: "/api/users" },
   { key: "students", path: "/api/students" },
+  { key: "alumni", path: "/api/alumni" },
   { key: "courses", path: "/api/courses" },
   { key: "departments", path: "/api/departments" },
   { key: "blogs", path: "/api/blogs" },
-  { key: "notices", path: "/api/notices" },
+  { key: "notices", path: "/api/notices?management=all" },
   { key: "events", path: "/api/events" },
   { key: "contacts", path: "/api/contacts" }
 ];
@@ -173,6 +174,7 @@ export default function AdminDashboard({ user }) {
     return [
       { icon: Users, label: "Users", value: dashboardCount(data, "users"), detail: "registered portal accounts", color: "#38bdf8" },
       { icon: GraduationCap, label: "Students", value: dashboardCount(data, "students"), detail: "student records in database", color: "#22c55e" },
+      { icon: Users, label: "Alumni", value: dashboardCount(data, "alumni"), detail: "alumni registrations", color: "#8b5cf6" },
       { icon: Mail, label: "Messages", value: dashboardCount(data, "contacts"), detail: "contact requests", color: "#f59e0b" }
     ];
   }, [data]);
@@ -190,6 +192,7 @@ export default function AdminDashboard({ user }) {
 
   const quickActions = [
     { title: "Students", detail: "Add and manage student records", icon: GraduationCap, route: "/admin/students", count: dashboardCount(data, "students") },
+    { title: "Alumni", detail: "Review and approve alumni registrations", icon: Users, route: "/admin/alumni", count: dashboardCount(data, "alumni") },
     { title: "Faculty", detail: "Review staff directory", icon: Users, route: "/admin/faculty", count: "Directory" },
     { title: "Courses", detail: "Edit public database course cards", icon: BookOpen, route: "/admin/courses", count: dashboardCount(data, "courses") },
     { title: "Website CMS", detail: "Customize public pages", icon: FilePenLine, route: "/admin/cms", count: dashboardCount(data, "blogs") },

@@ -6,8 +6,8 @@ import { useAuth } from "../../contexts/AuthContext.jsx";
 import { apiFetch, downloadCsv } from "../../lib/api.js";
 import { useModal } from "../../contexts/ModalContext.jsx";
 
-const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-const dayShort = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const dayShort = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const departments = [
   "Higher National Diploma in Accountancy - (HNDA)",
   "Higher National Diploma in English",
@@ -19,8 +19,7 @@ const departments = [
 ];
 const academicStages = ["First year Full Time", "Second year Full Time", "First year Part Time", "Second year Part Time"];
 const specialPeriods = ["Free Period", "Interval"];
-const defaultTimeSlots = ["08:00 - 09:00","09:00 - 10:00","10:00 - 11:00","11:00 - 12:00","12:00 - 01:00","01:00 - 02:00","02:00 - 03:00"];
-const timePattern = /^(0?[1-9]|1[0-2]):[0-5][0-9]\s*-\s*(0?[1-9]|1[0-2]):[0-5][0-9]$/;
+const defaultTimeSlots = ["00:00 - 00:00", "08:00 - 09:00","09:00 - 10:00","10:00 - 11:00","11:00 - 12:00","12:00 - 13:00","13:00 - 14:00","14:00 - 15:00"];
 const emptyForm = { department: departments[0], academicStage: "", day: "Monday", time: "08:00 - 09:00", subject: "", lecturer: "", room: "" };
 
 /* Subject color palette — uses CSS variables for theme safety */
@@ -35,17 +34,25 @@ const neutralPalette = { bg: "var(--md-hover)", border: "var(--md-border)", text
 const breakPalette   = { bg: "rgba(251,188,5,.06)", border: "rgba(251,188,5,.25)", text: "#f59e0b" };
 
 function isNonClassPeriod(subject) { return ["Lunch Break", "Free Period", "Interval"].includes(subject); }
-function getCurrentDayIndex() { const d = new Date().getDay(); return d >= 1 && d <= 5 ? d - 1 : 0; }
+function getCurrentDayIndex() { const d = new Date().getDay(); return d === 0 ? 6 : d - 1; }
 function getWeekDisplay() {
   const now = new Date(), s = new Date(now);
   s.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1));
-  const e = new Date(s); e.setDate(s.getDate() + 4);
+  const e = new Date(s); e.setDate(s.getDate() + 6);
   const fmt = (d) => `${d.getDate()} ${d.toLocaleString("default",{month:"short"})}`;
   return `${fmt(s)} – ${fmt(e)}, ${now.getFullYear()}`;
 }
-function parseSlotTime(v) { const [h="0",m="0"]=String(v||"").trim().split(":"); let hr=Number(h); if(hr>0&&hr<7)hr+=12; return hr*60+Number(m); }
+function parseSlotTime(value) {
+  const match=String(value||"").trim().match(/^(\d{1,2})(?::([0-5]\d))?\s*(am|pm)?$/i);
+  if(!match)return null;
+  let hour=Number(match[1]); const minute=Number(match[2]||0); const meridiem=String(match[3]||"").toLowerCase();
+  if(meridiem){if(hour<1||hour>12)return null;if(hour===12)hour=0;if(meridiem==="pm")hour+=12;}
+  else if(hour<0||hour>23)return null;
+  return hour*60+minute;
+}
 function parseTimeRange(t) { const [s,e]=String(t||"").split(/\s*-\s*/); if(!s||!e) return{start:null,end:null}; return{start:parseSlotTime(s),end:parseSlotTime(e)}; }
-function normalizeTimeRange(t) { const [s,e]=String(t||"").trim().split(/\s*-\s*/); const pad=(v)=>{const[h="",m=""]=String(v||"").split(":"); return`${h.padStart(2,"0")}:${m.padStart(2,"0")}`}; return`${pad(s)} - ${pad(e)}`; }
+function isFullDayRange(t) { const {start,end}=parseTimeRange(t); return start===0&&end===0; }
+function normalizeTimeRange(t) { const{start,end}=parseTimeRange(t); const format=(minutes)=>`${String(Math.floor(minutes/60)).padStart(2,"0")}:${String(minutes%60).padStart(2,"0")}`; return`${format(start)} - ${format(end)}`; }
 function isCurrentTimeSlot(t) { const now=new Date(),cur=now.getHours()*60+now.getMinutes(),{start,end}=parseTimeRange(t); if(start===null||end===null)return false; return cur>=start&&cur<end; }
 function sortEntries(arr) { return [...arr].sort((a,b)=>{const d=days.indexOf(a.day)-days.indexOf(b.day); if(d!==0)return d; const{start:as}=parseTimeRange(a.time),{start:bs}=parseTimeRange(b.time); if(as===null&&bs===null)return 0; if(as===null)return 1; if(bs===null)return-1; return as-bs;}); }
 function groupByDay(arr) { return days.map((day)=>({day,periods:sortEntries(arr.filter((e)=>e.day===day))})); }
@@ -54,7 +61,7 @@ function findPeriodsForSlot(periods,slot) { const ex=periods.filter(p=>p.time===
 function getStats(dayData) {
   if(!dayData) return{classes:0,hours:0,free:0};
   const classes=dayData.periods.filter(p=>!isNonClassPeriod(p.subject)&&p.subject).length;
-  const hours=dayData.periods.reduce((acc,p)=>{if(isNonClassPeriod(p.subject)||!p.subject)return acc; const{start,end}=parseTimeRange(p.time); if(start===null||end===null)return acc+1; return acc+Math.max(0,(end-start)/60);},0);
+  const hours=dayData.periods.reduce((acc,p)=>{if(isNonClassPeriod(p.subject)||!p.subject)return acc; const{start,end}=parseTimeRange(p.time); if(start===null||end===null)return acc+1; if(start===0&&end===0)return acc+24; return acc+Math.max(0,(end-start)/60);},0);
   return{classes,hours:Number(hours.toFixed(1)),free:Math.max(0,6-classes)};
 }
 function colorForSubject(subject) {
@@ -115,9 +122,8 @@ export default function TimetablePage() {
 
   const saveEntry = async (e) => {
     e.preventDefault(); setSaving(true); setError(""); setStatus("");
-    if(!timePattern.test(form.time.trim())) { setError("Use a valid time range like 08:00 - 09:00."); setSaving(false); return; }
     const{start,end}=parseTimeRange(form.time);
-    if(start===null||end===null||end<=start) { setError("End time must be after start time."); setSaving(false); return; }
+    if(start===null||end===null||(!isFullDayRange(form.time)&&end<=start)) { setError("Enter a valid time range, or use 00:00 - 00:00 for a full-day period."); setSaving(false); return; }
     const payload={...form,time:normalizeTimeRange(form.time),academicStage:form.academicStage,department:isFaculty?undefined:form.department};
     try {
       const saved=editingId ? await apiFetch(`/api/timetable/${editingId}`,{method:"PUT",body:JSON.stringify(payload)}) : await apiFetch("/api/timetable",{method:"POST",body:JSON.stringify(payload)});
@@ -188,9 +194,9 @@ export default function TimetablePage() {
                 {academicStages.map(s=><option key={s} value={s}>{s}</option>)}
               </select>
               <label className="space-y-1">
-                <input required value={form.time} onChange={e=>setForm(c=>({...c,time:e.target.value}))} list="tt-slots" placeholder="08:00 - 09:00" className="portal-input"/>
+                <input required value={form.time} onChange={e=>setForm(c=>({...c,time:e.target.value}))} list="tt-slots" placeholder="13:30 - 15:00 or 1:30 PM - 3:00 PM" className="portal-input"/>
                 <datalist id="tt-slots">{defaultTimeSlots.map(s=><option key={s} value={s}/>)}</datalist>
-                <span className="portal-card-label" style={{display:"block",marginTop:"0.25rem"}}>Format: 08:00 - 09:00</span>
+                <span className="portal-card-label" style={{display:"block",marginTop:"0.25rem"}}>24-hour or AM/PM format · Full day: 00:00 - 00:00</span>
               </label>
               <label className="space-y-1">
                 <input required value={form.subject} onChange={e=>setForm(c=>({...c,subject:e.target.value}))} list="tt-subjects" placeholder="Subject" className="portal-input"/>
@@ -277,7 +283,7 @@ export default function TimetablePage() {
                     <div className="classroom-card p-4" style={{borderLeft:`4px solid ${pal.border}`,background:pal.bg}}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="mb-2 flex items-center gap-1.5 font-mono text-xs" style={{color:"var(--md-text-secondary)"}}><Clock size={12}/>{period.time}</p>
+                          <p className="mb-2 flex items-center gap-1.5 font-mono text-xs" style={{color:"var(--md-text-secondary)"}}><Clock size={12}/>{isFullDayRange(period.time)?"Full day (00:00 - 00:00)":period.time}</p>
                           <h3 className="font-semibold" style={{color:isLunch?"var(--md-text-secondary)":pal.text,fontStyle:isLunch?"italic":"normal"}}>{period.subject||"Free Period"}</h3>
                           {period.academicStage&&!isLunch&&(
                             <span className="mt-1.5 portal-badge portal-badge-info" style={{display:"inline-flex"}}>{period.academicStage}</span>

@@ -44,6 +44,7 @@ const footerSocialLinks = [
 const portalPathForRole = (role) => {
   const normalized = String(role || "student").toLowerCase();
   if (normalized === "admin") return "/admin";
+  if (normalized === "alumni") return "/alumni";
   if (normalized === "faculty" || normalized === "lecturer" || normalized === "staff") return "/faculty";
   return "/student";
 };
@@ -51,6 +52,7 @@ const portalPathForRole = (role) => {
 const portalLabelForRole = (role) => {
   const normalized = String(role || "student").toLowerCase();
   if (normalized === "admin") return "Admin Portal";
+  if (normalized === "alumni") return "Alumni Portal";
   if (normalized === "faculty" || normalized === "lecturer" || normalized === "staff") return "Staff Portal";
   return "Student Portal";
 };

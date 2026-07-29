@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Award, BarChart3, Download, Edit3, Plus, RefreshCw, Save, Search, Trash2, X } from "lucide-react";
+import { Award, BarChart3, Download, Edit3, FileUp, Plus, RefreshCw, Save, Search, Trash2, Upload, X } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import GlassCard from "../../components/GlassCard";
 import { useAuth } from "../../contexts/AuthContext";
@@ -11,6 +11,28 @@ const gradePoints = { "A+": 4.0, A: 4.0, "A-": 3.7, "B+": 3.3, B: 3.0, "B-": 2.7
 const gradeOptions = Object.keys(gradePoints);
 
 const emptyForm = { student: "", subject: "", semester: 1, credits: 3, score: 0, grade: "F", remarks: "" };
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [], cell = "", quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === '"' && quoted && text[index + 1] === '"') { cell += '"'; index += 1; }
+    else if (char === '"') quoted = !quoted;
+    else if (char === "," && !quoted) { row.push(cell.trim()); cell = ""; }
+    else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && text[index + 1] === "\n") index += 1;
+      row.push(cell.trim());
+      if (row.some(Boolean)) rows.push(row);
+      row = []; cell = "";
+    } else cell += char;
+  }
+  row.push(cell.trim());
+  if (row.some(Boolean)) rows.push(row);
+  if (rows.length < 2) return [];
+  const headers = rows[0].map((value) => value.replace(/^\uFEFF/, "").replace(/[\s_-]/g, "").toLowerCase());
+  return rows.slice(1).map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] || ""])));
+}
 
 function gradeFromScore(score) {
   const v = Number(score);
@@ -99,6 +121,7 @@ export default function GradesPage() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [search, setSearch] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [subjectFilter, setSubjectFilter] = useState("all");
@@ -107,6 +130,7 @@ export default function GradesPage() {
   const [studentFilter, setStudentFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
 
@@ -251,6 +275,45 @@ export default function GradesPage() {
 
   const startCreate = () => { setError(""); setStatus(""); setForm(emptyForm); setEditingId(""); setShowForm(true); };
 
+  const downloadImportTemplate = () => downloadCsv("ati-grade-import-template.csv", [
+    { studentId: "ATI/2024/001", email: "student@example.com", subject: "Database Systems", semester: 1, credits: 3, score: 78, grade: "", remarks: "" }
+  ]);
+
+  const importGrades = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setError(""); setStatus("");
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setError("Choose a CSV file exported from the grade import template.");
+      return;
+    }
+    try {
+      const rows = parseCsv(await file.text()).map((row) => ({
+        studentId: row.studentid || row.student || "",
+        email: row.email || "",
+        subject: row.subject || "",
+        semester: row.semester || "",
+        credits: row.credits || "",
+        score: row.score || "",
+        grade: row.grade || "",
+        remarks: row.remarks || ""
+      }));
+      if (!rows.length) throw new Error("The CSV has no grade rows.");
+      setImporting(true);
+      const result = await apiFetch("/api/grades/bulk-import", { method: "POST", body: JSON.stringify({ grades: rows }) });
+      await loadData();
+      const failed = result.errors?.length || 0;
+      setStatus(`${result.created} created, ${result.updated} updated${failed ? `; ${failed} row(s) need attention.` : "."}`);
+      setShowImport(false);
+      if (failed) setError(result.errors.slice(0, 5).map((item) => `Row ${item.row}: ${item.message}`).join(" "));
+    } catch (err) {
+      setError(err?.message || "Unable to import grades.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const startEdit = (grade) => {
     setError(""); setStatus("");
     setForm({ student: grade.student || "", subject: grade.subject || "", semester: grade.semester || 1, credits: grade.credits || 3, score: grade.score || 0, grade: grade.grade || gradeFromScore(grade.score), remarks: grade.remarks || "" });
@@ -330,6 +393,11 @@ export default function GradesPage() {
             </button>
           )}
           {canManage && (
+            <button type="button" onClick={() => { setError(""); setStatus(""); setShowImport((value) => !value); }} className="portal-btn">
+              <FileUp size={15} /> Bulk Import
+            </button>
+          )}
+          {canManage && (
             <button type="button" onClick={startCreate} className="portal-btn-primary">
               <Plus size={15} /> Add Grade
             </button>
@@ -340,6 +408,24 @@ export default function GradesPage() {
       {/* Alerts */}
       {error  && <div className="portal-alert-danger">{error}</div>}
       {status && <div className="portal-alert-success">{status}</div>}
+
+      {showImport && canManage && (
+        <GlassCard className="p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="classroom-section-title">Bulk Import Grades</h2>
+              <p className="mt-1 text-sm" style={{ color: "var(--md-text-secondary)" }}>Upload a CSV with studentId or email, subject, semester, credits, score, grade (optional), and remarks (optional). Existing student-subject-semester rows are updated.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={downloadImportTemplate} className="portal-btn"><Download size={15} /> Template</button>
+              <label className="portal-btn-primary cursor-pointer">
+                <Upload size={15} /> {importing ? "Importing…" : "Choose CSV"}
+                <input type="file" accept=".csv,text/csv" onChange={importGrades} disabled={importing} className="hidden" />
+              </label>
+            </div>
+          </div>
+        </GlassCard>
+      )}
 
       {isAdmin && (
         <>

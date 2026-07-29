@@ -97,6 +97,10 @@ export async function buildRoleProfile(user) {
     return { ...base, department_id: studentProfile?.department || "", studentProfile };
   }
 
+  if (plain.role === "alumni") {
+    return { ...base, department_id: plain.alumniProfile?.department || "", alumniProfile: plain.alumniProfile };
+  }
+
   if (["lecturer", "department_staff", "finance_officer"].includes(plain.role)) {
     const staffProfile = await getStaffProfileForUser(plain);
     return { ...base, department_id: staffProfile?.department || "", staffProfile, facultyProfile: staffProfile };

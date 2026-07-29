@@ -11,6 +11,7 @@ import useCmsPage, { usePageSeo } from "../hooks/useCmsPage.js";
 import { apiFetch } from "../lib/api.js";
 import heroBg from "../assets/ChatGPT Image May 22, 2026, 10_31_39 PM.png";
 import { useLanguage } from "../contexts/LanguageContext.jsx";
+import { useAuth } from "../contexts/AuthContext.jsx";
 
 const icons = [BookOpen, GraduationCap, Users, Users, CalendarDays];
 const statKeys = ["courses", "departments", "students", "lecturers", "events"];
@@ -96,6 +97,7 @@ function CampusParallaxSection({ children }) {
 
 export default function Home() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [notices, setNotices] = useState([]);
   const [blogs, setBlogs] = useState([]);
   const [publicCourses, setPublicCourses] = useState([]);
@@ -165,7 +167,6 @@ export default function Home() {
         if (!active) return;
         setNotices(
           (Array.isArray(items) ? items : [])
-            .filter((notice) => !notice.audience || ["all", "students"].includes(notice.audience))
             .sort((a, b) => noticePriority(b) - noticePriority(a) || new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
             .slice(0, 3)
         );
@@ -209,7 +210,7 @@ export default function Home() {
       active = false;
       window.clearInterval(statsInterval);
     };
-  }, []);
+  }, [user?.role]);
 
   const visibleBlogs = blogs.slice(0, 3);
   const statsWithBlogCount = liveStats.map((item, index) =>
@@ -326,19 +327,20 @@ export default function Home() {
             className="grid gap-5 md:grid-cols-3"
           >
             {publicCourses.map((course) => (
-              <div
+              <article
                 key={course._id || course.title}
+                className="h-full"
               >
-                <GlassCard className="group">
+                <GlassCard className="group flex h-full flex-col">
                   <h3 className="text-xl font-black text-clay-text">{course.title}</h3>
-                  <p className="mt-3 text-sm text-clay-muted">
+                  <p className="mt-3 flex-1 text-sm leading-6 text-clay-muted">
                     {[course.duration, course.entryRequirements].filter(Boolean).join(" | ") || "Course details will be updated soon."}
                   </p>
-                  <a href="/courses" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-clay-accent transition group-hover:gap-3">
+                  <a href="/courses" className="mt-5 inline-flex w-fit items-center gap-2 pt-1 text-sm font-bold text-clay-accent transition group-hover:gap-3">
                     {t("common.viewCourses")} <ArrowRight size={16} />
                   </a>
                 </GlassCard>
-              </div>
+              </article>
             ))}
           </div>
         </div>

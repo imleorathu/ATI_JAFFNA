@@ -6,7 +6,7 @@ import User from "../models/User.js";
 
 dotenv.config();
 
-const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/ATI_JAFFNA";
+const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/ATI_Jaffna";
 const password = process.argv[2] || "12345678";
 
 function studentProfileFromStudent(student) {

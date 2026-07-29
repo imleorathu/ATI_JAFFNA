@@ -1,10 +1,12 @@
 import bcrypt from "bcryptjs";
+import Alumni from "../models/Alumni.js";
 import DepartmentStaff from "../models/DepartmentStaff.js";
 import Faculty from "../models/Faculty.js";
 import Student from "../models/Student.js";
 import User from "../models/User.js";
 import { deleteStaffAccountBundle } from "./staffProfileSync.js";
 import { adminProfileFromPayload, buildRoleProfile, buildRoleProfiles, staffProfileFromPayload, studentProfileFromPayload } from "../services/userProfileService.js";
+import { canonicalDepartmentName } from "../services/departmentService.js";
 
 const allowedRoles = ["student", "lecturer", "staff", "faculty", "department_staff", "finance_officer", "finance", "admin"];
 const allowedStatuses = ["pending", "approved", "rejected"];
@@ -43,6 +45,22 @@ function profilePatchForRole(role, body) {
   }
 
   return {};
+}
+
+async function canonicalizeProfileDepartment(role, body) {
+  const profileKey = role === "student"
+    ? "studentProfile"
+    : role === "alumni"
+      ? "alumniProfile"
+      : ["lecturer", "department_staff", "finance_officer"].includes(role)
+        ? (body.staffProfile !== undefined ? "staffProfile" : "facultyProfile")
+        : role === "admin"
+          ? "adminProfile"
+          : "";
+  const profile = profileKey ? body[profileKey] : null;
+  if (!profile || profile.department === undefined) return;
+
+  profile.department = await canonicalDepartmentName(profile.department, { required: role !== "admin" && role !== "finance_officer" });
 }
 
 async function syncLinkedProfile(user, previousEmail) {
@@ -121,6 +139,7 @@ export async function createUser(req, res, next) {
     if (!allowedRoles.includes(requestedRole)) return res.status(400).json({ message: "Invalid role." });
 
     const role = normalizeRole(requestedRole);
+    await canonicalizeProfileDepartment(role, req.body);
     const accountStatus = allowedStatuses.includes(String(req.body.accountStatus).toLowerCase())
       ? String(req.body.accountStatus).toLowerCase()
       : "approved";
@@ -157,10 +176,28 @@ export async function updateUser(req, res, next) {
       const accountStatus = String(req.body.accountStatus).toLowerCase();
       if (!allowedStatuses.includes(accountStatus)) return res.status(400).json({ message: "Invalid account status." });
       current.accountStatus = accountStatus;
+      if (current.role === "alumni" && current.alumniProfile?.alumniId) {
+        await Alumni.findByIdAndUpdate(current.alumniProfile.alumniId, {
+          accountStatus,
+          reviewedAt: new Date(),
+          reviewedBy: req.user.id
+        });
+      }
     }
 
-    if (req.body.studentProfile !== undefined || req.body.staffProfile !== undefined || req.body.facultyProfile !== undefined || req.body.adminProfile !== undefined) {
-      Object.assign(current, profilePatchForRole(current.role, req.body));
+    if (req.body.studentProfile !== undefined || req.body.alumniProfile !== undefined || req.body.staffProfile !== undefined || req.body.facultyProfile !== undefined || req.body.adminProfile !== undefined) {
+      await canonicalizeProfileDepartment(current.role, req.body);
+      if (current.role === "alumni" && req.body.alumniProfile !== undefined) {
+        current.alumniProfile = {
+          ...current.alumniProfile.toObject(),
+          ...req.body.alumniProfile
+        };
+        await Alumni.findByIdAndUpdate(current.alumniProfile.alumniId, {
+          department: current.alumniProfile.department
+        }, { runValidators: true });
+      } else {
+        Object.assign(current, profilePatchForRole(current.role, req.body));
+      }
     }
 
     if (req.body.password !== undefined && String(req.body.password).trim()) {
@@ -186,6 +223,9 @@ export async function deleteUser(req, res, next) {
     if (!user) return res.status(404).json({ message: "User not found" });
     if (["lecturer", "department_staff", "finance_officer"].includes(user.role)) {
       await deleteStaffAccountBundle(user);
+    }
+    if (user.role === "alumni" && user.alumniProfile?.alumniId) {
+      await Alumni.findByIdAndDelete(user.alumniProfile.alumniId);
     }
     res.json({ message: "User deleted" });
   } catch (error) {

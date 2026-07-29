@@ -35,6 +35,9 @@ function normalizePayload(Model, payload) {
   if (Model.modelName !== "Student") return payload;
 
   const normalized = { ...payload };
+  if (normalized.academicYear !== undefined) {
+    normalized.academicYear = String(normalized.academicYear || "").trim();
+  }
   if (normalized.academicStage) {
     normalized.studyMode = String(normalized.academicStage).includes("Part Time") ? "Part-time" : "Full-time";
   }
@@ -64,10 +67,16 @@ function facultyLoginPayload(payload, passwordHash) {
 }
 
 function parseSlotTime(value) {
-  const [hourText = "0", minuteText = "0"] = String(value || "").trim().split(":");
-  let hour = Number(hourText);
-  const minute = Number(minuteText);
-  if (hour > 0 && hour < 7) hour += 12;
+  const match = String(value || "").trim().match(/^(\d{1,2})(?::([0-5]\d))?\s*(am|pm)?$/i);
+  if (!match) return null;
+  let hour = Number(match[1]);
+  const minute = Number(match[2] || 0);
+  const meridiem = String(match[3] || "").toLowerCase();
+  if (meridiem) {
+    if (hour < 1 || hour > 12) return null;
+    if (hour === 12) hour = 0;
+    if (meridiem === "pm") hour += 12;
+  } else if (hour < 0 || hour > 23) return null;
   return hour * 60 + minute;
 }
 
@@ -79,15 +88,12 @@ function parseTimeRange(timeRange) {
 
 function validateTimetablePayload(payload) {
   const { start, end } = parseTimeRange(payload.time);
-  if (start === null || end === null || end <= start) {
-    return "Use a valid time range like 08:00 - 09:00 or 01:00 - 02:00.";
+  const isFullDay = start === 0 && end === 0;
+  if (start === null || end === null || (!isFullDay && end <= start)) {
+    return "Use a valid range such as 08:30 - 10:00, or use 00:00 - 00:00 for a full-day period.";
   }
-  const [startText, endText] = String(payload.time || "").trim().split(/\s*-\s*/);
-  const format = (value) => {
-    const [hour = "", minute = ""] = String(value || "").split(":");
-    return `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
-  };
-  payload.time = `${format(startText)} - ${format(endText)}`;
+  const format = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+  payload.time = isFullDay ? "00:00 - 00:00" : `${format(start)} - ${format(end)}`;
   return "";
 }
 
@@ -267,6 +273,10 @@ export function createCrudController(Model) {
             payload.program = payload.program || scope.department;
           }
 
+          if (!payload.academicYear) {
+            return res.status(400).json({ message: "Academic year is required." });
+          }
+
           const password = String(req.body.password || "");
           const confirmPassword = String(req.body.confirmPassword || "");
           if (!password) return res.status(400).json({ message: "Password is required to create a student login." });
@@ -417,6 +427,9 @@ export function createCrudController(Model) {
           if (scope?.department) {
             payload.department = scope.department;
             payload.program = payload.program || scope.department;
+          }
+          if (!payload.academicYear) {
+            return res.status(400).json({ message: "Academic year is required." });
           }
           const nextEmail = String(payload.email || "").trim().toLowerCase();
           const nextStudentId = String(payload.studentId || "").trim();

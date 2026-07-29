@@ -1,5 +1,7 @@
 {
   "scripts": {
+    "start": "npm run dev:full",
+    "dev": "npm run dev:full",
     "dev:full": "concurrently -k -n backend,frontend -c blue,green \"npm --prefix Backend run dev\" \"npm --prefix Frontend run dev\""
   },
   "dependencies": {

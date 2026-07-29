@@ -9,6 +9,7 @@ const departmentStaffRoles = ["lecturer", "department_staff"];
 const campusLatitude = Number(process.env.ATI_CAMPUS_LAT || 9.651841);
 const campusLongitude = Number(process.env.ATI_CAMPUS_LNG || 80.023445);
 const allowedRadiusMeters = Number(process.env.ATTENDANCE_RADIUS_METERS || 500);
+const nonTeachingPeriods = ["Lunch Break", "Free Period", "Interval"];
 
 function todayParts(date = new Date()) {
   const year = date.getFullYear();
@@ -21,10 +22,16 @@ function todayParts(date = new Date()) {
 }
 
 function parseSlotTime(value) {
-  const [hourText = "0", minuteText = "0"] = String(value || "").trim().split(":");
-  let hour = Number(hourText);
-  const minute = Number(minuteText);
-  if (hour > 0 && hour < 7) hour += 12;
+  const match = String(value || "").trim().match(/^(\d{1,2})(?::([0-5]\d))?\s*(am|pm)?$/i);
+  if (!match) return null;
+  let hour = Number(match[1]);
+  const minute = Number(match[2] || 0);
+  const meridiem = String(match[3] || "").toLowerCase();
+  if (meridiem) {
+    if (hour < 1 || hour > 12) return null;
+    if (hour === 12) hour = 0;
+    if (meridiem === "pm") hour += 12;
+  } else if (hour < 0 || hour > 23) return null;
   return hour * 60 + minute;
 }
 
@@ -32,7 +39,10 @@ function isCurrentPeriod(timeSlot, now = new Date()) {
   const [start, end] = String(timeSlot || "").split(" - ");
   if (!start || !end) return false;
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  return currentMinutes >= parseSlotTime(start) && currentMinutes < parseSlotTime(end);
+  const startMinutes = parseSlotTime(start);
+  const endMinutes = parseSlotTime(end);
+  if (startMinutes === null || endMinutes === null) return false;
+  return currentMinutes >= startMinutes && currentMinutes < endMinutes;
 }
 
 function distanceMeters(lat1, lon1, lat2, lon2) {
@@ -69,9 +79,10 @@ async function currentEntryForStudent(department, academicStage = "", now = new 
   const entries = await TimetableEntry.find({
     department,
     day,
+    subject: { $nin: nonTeachingPeriods },
     $or: [{ academicStage: "" }, { academicStage: { $exists: false } }, ...(academicStage ? [{ academicStage }] : [])]
   }).sort({ time: 1 });
-  return entries.find((entry) => entry.subject !== "Lunch Break" && isCurrentPeriod(entry.time, now)) || null;
+  return entries.find((entry) => isCurrentPeriod(entry.time, now)) || null;
 }
 
 function recordResponse(record) {

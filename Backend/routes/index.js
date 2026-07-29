@@ -25,6 +25,10 @@ import partTimeFeesRoutes from "./partTimeFeesRoutes.js";
 import portalDataRoutes from "./portalDataRoutes.js";
 import userRoutes from "./userRoutes.js";
 import donationRoutes from "./donationRoutes.js";
+import studyMaterialRoutes from "./studyMaterialRoutes.js";
+import alumniRoutes from "./alumniRoutes.js";
+import { alumniChatAdminRoutes, alumniChatRoutes } from "./alumniChatRoutes.js";
+import { alumniNotificationRoutes, blockRoutes, connectionRoutes, directoryRoutes, feedRoutes, followRoutes, postRoutes, privacyRoutes, reportRoutes, savedRoutes, verificationRoutes } from "./alumniSocialRoutes.js";
 
 const router = Router();
 
@@ -220,6 +224,20 @@ router.get("/public/faculty/:id/course-details", async (req, res, next) => {
 });
 
 router.use("/auth", authRoutes);
+router.use("/alumni", alumniRoutes);
+router.use("/alumni-chat", alumniChatRoutes);
+router.use("/admin/alumni-social", alumniChatAdminRoutes);
+router.use("/alumni-directory", directoryRoutes);
+router.use("/connections", connectionRoutes);
+router.use("/follows", followRoutes);
+router.use("/blocks", blockRoutes);
+router.use("/feed", feedRoutes);
+router.use("/posts", postRoutes);
+router.use("/alumni-notifications", alumniNotificationRoutes);
+router.use("/saved", savedRoutes);
+router.use("/privacy", privacyRoutes);
+router.use("/reports", reportRoutes);
+router.use("/alumni-verification", verificationRoutes);
 router.use("/cms", pageContentRoutes);
 router.use("/portal-data", portalDataRoutes);
 router.use("/part-time-fees", partTimeFeesRoutes);
@@ -230,6 +248,7 @@ router.use("/assignments", assignmentRoutes);
 router.use("/attendance", attendanceRoutes);
 router.use("/forms", formRoutes);
 router.use("/grades", gradeRoutes);
+router.use("/study-materials", studyMaterialRoutes);
 router.use("/users", userRoutes);
 router.get("/students/my-department", requireAuth, listMyDepartmentStudents);
 router.get("/faculty/timetable-options", requireAuth, listTimetableLecturers);

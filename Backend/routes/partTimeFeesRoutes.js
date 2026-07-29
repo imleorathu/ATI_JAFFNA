@@ -37,13 +37,14 @@ import {
   verifyReceipt
 } from "../controllers/partTimeFeesController.js";
 import { requireAuth } from "../middleware/auth.js";
-import { requireFeeManagementAccess } from "../middleware/feeAccess.js";
+import { requireFeeManagementAccess, requirePartTimeStudentFeeAccess } from "../middleware/feeAccess.js";
 
 const router = Router();
 
 router.get("/receipts/verify/:code", verifyReceipt);
 
 router.use(requireAuth);
+router.use(requirePartTimeStudentFeeAccess);
 
 router.get("/dashboard", dashboard);
 router.get("/students", requireFeeManagementAccess, listFeeStudents);
